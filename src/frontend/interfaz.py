@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
+from datetime import datetime
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -19,16 +20,83 @@ class AppEscolar(ctk.CTk):
         self.tab_view = ctk.CTkTabview(self)
         self.tab_view.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
+        # Barra de estado (Footer)
+        self.lbl_estado = ctk.CTkLabel(self, text="Listo", anchor="w", text_color="gray")
+        self.lbl_estado.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 10))
+
+        self.tab_inicio = self.tab_view.add("Inicio")
         self.tab_inscripcion = self.tab_view.add("Inscripción y Alumnos")
         self.tab_apoderados = self.tab_view.add("Apoderados")
         self.tab_pagos = self.tab_view.add("Mensualidades")
+        self.tab_config = self.tab_view.add("Configuración")
 
         self.mapa_apoderados = {}
         self.mapa_estudiantes_pago = {}
+        self.ventana_morosos = None
 
+        self.setup_ui_inicio()
         self.setup_ui_apoderados()
         self.setup_ui_inscripcion()
         self.setup_ui_pagos()
+        self.setup_ui_configuracion()
+
+    def mostrar_mensaje_estado(self, mensaje, es_error=False):
+        color = "red" if es_error else "green"
+        self.lbl_estado.configure(text=mensaje, text_color=color)
+        # Restaurar mensaje por defecto "Listo" después de 4 segundos (4000 ms)
+        self.after(4000, lambda: self.lbl_estado.configure(text="Listo", text_color="gray"))
+
+    def setup_ui_inicio(self):
+        self.tab_inicio.grid_columnconfigure((0, 1), weight=1)
+        
+        # Título de bienvenida
+        ctk.CTkLabel(self.tab_inicio, text="Panel de Control", font=("Arial", 24, "bold")).grid(row=0, column=0, columnspan=2, pady=20)
+
+        # Tarjeta 1: Total Alumnos
+        self.card_alumnos = ctk.CTkFrame(self.tab_inicio, fg_color="#3B8ED0")
+        self.card_alumnos.grid(row=1, column=0, padx=20, pady=20, sticky="ew")
+        ctk.CTkLabel(self.card_alumnos, text="Total Alumnos", font=("Arial", 16), text_color="white").pack(pady=(10,0))
+        self.lbl_total_alumnos = ctk.CTkLabel(self.card_alumnos, text="0", font=("Arial", 32, "bold"), text_color="white")
+        self.lbl_total_alumnos.pack(pady=(0,10))
+
+        # Tarjeta 2: Ingresos del Mes
+        self.card_ingresos = ctk.CTkFrame(self.tab_inicio, fg_color="#2CC985")
+        self.card_ingresos.grid(row=1, column=1, padx=20, pady=20, sticky="ew")
+        self.lbl_titulo_ingresos = ctk.CTkLabel(self.card_ingresos, text="Ingresos Mes Actual", font=("Arial", 16), text_color="white")
+        self.lbl_titulo_ingresos.pack(pady=(10,0))
+        self.lbl_total_ingresos = ctk.CTkLabel(self.card_ingresos, text="$0", font=("Arial", 32, "bold"), text_color="white")
+        self.lbl_total_ingresos.pack(pady=(0,10))
+
+        # Accesos Rápidos
+        frame_acciones = ctk.CTkFrame(self.tab_inicio, fg_color="transparent")
+        frame_acciones.grid(row=2, column=0, columnspan=2, pady=20)
+        
+        ctk.CTkLabel(frame_acciones, text="Accesos Rápidos:", font=("Arial", 14, "bold")).pack(side="left", padx=10)
+        ctk.CTkButton(frame_acciones, text="+ Nuevo Alumno", command=lambda: self.tab_view.set("Inscripción y Alumnos")).pack(side="left", padx=10)
+        ctk.CTkButton(frame_acciones, text="+ Registrar Pago", command=lambda: self.tab_view.set("Mensualidades")).pack(side="left", padx=10)
+        ctk.CTkButton(frame_acciones, text="↻ Actualizar Datos", fg_color="gray", command=lambda: self.controller.actualizar_dashboard()).pack(side="left", padx=10)
+
+    def actualizar_tarjetas_dashboard(self, total_alumnos, ingresos, mes):
+        self.lbl_total_alumnos.configure(text=str(total_alumnos))
+        self.lbl_total_ingresos.configure(text=f"${ingresos:,.2f}")
+        self.lbl_titulo_ingresos.configure(text=f"Ingresos de {mes}")
+
+    def setup_ui_configuracion(self):
+        frame = self.tab_config
+        
+        ctk.CTkLabel(frame, text="Configuración General", font=("Arial", 20, "bold")).pack(pady=20)
+        
+        ctk.CTkLabel(frame, text="Nombre de la Escuela (para reportes):").pack(pady=5)
+        self.entry_nombre_escuela = ctk.CTkEntry(frame, width=300)
+        self.entry_nombre_escuela.pack(pady=5)
+        # Cargar valor actual
+        if hasattr(self.controller, 'nombre_escuela'):
+            self.entry_nombre_escuela.insert(0, self.controller.nombre_escuela)
+            
+        ctk.CTkButton(frame, text="Guardar Configuración", command=self.solicitar_guardar_config).pack(pady=20)
+        
+        ctk.CTkLabel(frame, text="Mantenimiento", font=("Arial", 16, "bold")).pack(pady=(40, 10))
+        ctk.CTkButton(frame, text="Crear Respaldo de Base de Datos (Backup)", fg_color="#E0A800", text_color="black", command=self.controller.realizar_backup).pack(pady=10)
 
     def setup_ui_apoderados(self):
         frame = self.tab_apoderados
@@ -124,6 +192,9 @@ class AppEscolar(ctk.CTk):
         self.entry_apo_email.delete(0, 'end')
 
     def setup_ui_inscripcion(self):
+        # Asegurar que el controlador tenga el nombre cargado antes de mostrar
+        if hasattr(self.controller, 'nombre_escuela') and not self.entry_nombre_escuela.get():
+             self.entry_nombre_escuela.insert(0, self.controller.nombre_escuela)
         frame = self.tab_inscripcion
         frame.grid_columnconfigure(1, weight=1)
         frame.grid_rowconfigure(0, weight=1)
@@ -225,7 +296,7 @@ class AppEscolar(ctk.CTk):
 
     def actualizar_combo_apoderados(self, lista_apoderados):
         # Recibe lista de tuplas (id, nombre)
-        self.mapa_apoderados = {f"{id} - {nombre}": id for id, nombre in lista_apoderados}
+        self.mapa_apoderados = {nombre: id for id, nombre in lista_apoderados}
         values = list(self.mapa_apoderados.keys())
         self.combo_apoderados.configure(values=values)
         if values:
@@ -272,6 +343,9 @@ class AppEscolar(ctk.CTk):
             id_alumno = item['values'][0]
             self.controller.eliminar_alumno(id_alumno)
 
+    def solicitar_guardar_config(self):
+        self.controller.guardar_ajustes(self.entry_nombre_escuela.get())
+
     def setup_ui_pagos(self):
         frame = self.tab_pagos
         frame.grid_columnconfigure(1, weight=1)
@@ -282,10 +356,11 @@ class AppEscolar(ctk.CTk):
 
         ctk.CTkLabel(panel_pago, text="Seleccionar Alumno:").pack(pady=5)
         self.combo_alu_pago = ctk.CTkComboBox(panel_pago, values=[])
+        self.combo_alu_pago.set("")
         self.combo_alu_pago.pack(pady=5)
 
         ctk.CTkLabel(panel_pago, text="Mes a Pagar:").pack(pady=5)
-        self.combo_mes = ctk.CTkComboBox(panel_pago, values=["Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
+        self.combo_mes = ctk.CTkComboBox(panel_pago, values=self.controller.MESES)
         self.combo_mes.pack(pady=5)
         
         ctk.CTkLabel(panel_pago, text="Monto:").pack(pady=5)
@@ -293,23 +368,57 @@ class AppEscolar(ctk.CTk):
         self.entry_pago_monto.pack()
         
         ctk.CTkButton(panel_pago, text="Registrar Pago", command=self.solicitar_pago).pack(pady=20)
-        ctk.CTkButton(panel_pago, text="Ver Morosos (Mes Actual)", fg_color="#D35B58", hover_color="#C72C41", command=self.solicitar_morosos).pack(pady=5)
-        ctk.CTkButton(panel_pago, text="Exportar Historial CSV", fg_color="green", command=self.solicitar_exportar_pagos).pack(pady=20)
+        
+        # Sección de Administración
+        ctk.CTkLabel(panel_pago, text="--- Administración ---", text_color="gray").pack(pady=(10, 5))
+        ctk.CTkButton(panel_pago, text="Modificar Seleccionado", fg_color="#E0A800", text_color="black", command=self.solicitar_modificar_pago).pack(pady=5)
+        ctk.CTkButton(panel_pago, text="Eliminar Seleccionado", fg_color="red", command=self.solicitar_eliminar_pago).pack(pady=5)
+
+        # Sección de Reportes
+        ctk.CTkLabel(panel_pago, text="--- Reportes ---", text_color="gray").pack(pady=(20, 5))
+        ctk.CTkLabel(panel_pago, text="Mes de Corte:").pack(pady=2)
+        self.combo_mes_reporte = ctk.CTkComboBox(panel_pago, values=self.controller.MESES)
+        # Seleccionar mes actual por defecto
+        mes_actual_idx = datetime.now().month - 1
+        self.combo_mes_reporte.set(self.controller.MESES[mes_actual_idx])
+        self.combo_mes_reporte.pack(pady=5)
+        ctk.CTkButton(panel_pago, text="Ver Morosos", fg_color="#D35B58", hover_color="#C72C41", command=self.solicitar_morosos).pack(pady=5)
+        ctk.CTkButton(panel_pago, text="Exportar Historial CSV", fg_color="green", command=self.solicitar_exportar_pagos).pack(pady=5)
 
         # Panel Derecho: Historial
+        panel_derecho = ctk.CTkFrame(frame, fg_color="transparent")
+        panel_derecho.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        panel_derecho.grid_rowconfigure(1, weight=1)
+        panel_derecho.grid_columnconfigure(0, weight=1)
+
+        # Buscador de Pagos
+        frame_busqueda = ctk.CTkFrame(panel_derecho, fg_color="transparent")
+        frame_busqueda.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        
+        self.entry_busqueda_pagos = ctk.CTkEntry(frame_busqueda, placeholder_text="Buscar pago por alumno...")
+        self.entry_busqueda_pagos.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.entry_busqueda_pagos.bind("<Return>", lambda event: self.solicitar_busqueda_pagos())
+        
+        ctk.CTkButton(frame_busqueda, text="Buscar", width=100, command=self.solicitar_busqueda_pagos).pack(side="right")
+
         style = ttk.Style()
-        columns = ("ID", "Alumno", "Monto", "Mes", "Estado")
-        self.tree_pagos = ttk.Treeview(frame, columns=columns, show="headings")
+        columns = ("ID", "Alumno", "Monto", "Mes", "Estado", "Fecha")
+        self.tree_pagos = ttk.Treeview(panel_derecho, columns=columns, show="headings")
         for col in columns:
             self.tree_pagos.heading(col, text=col)
-            self.tree_pagos.column(col, width=90)
-        self.tree_pagos.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+            width = 140 if col == "Fecha" else 90
+            self.tree_pagos.column(col, width=width)
+        self.tree_pagos.grid(row=1, column=0, sticky="nsew")
+        self.tree_pagos.bind("<Double-1>", self.on_double_click_pago)
 
     def actualizar_combo_estudiantes_pago(self, lista_estudiantes):
-        self.mapa_estudiantes_pago = {f"{id} - {nombre}": id for id, nombre in lista_estudiantes}
+        self.mapa_estudiantes_pago = {nombre: id for id, nombre in lista_estudiantes}
         values = list(self.mapa_estudiantes_pago.keys())
         self.combo_alu_pago.configure(values=values)
-        if values: self.combo_alu_pago.set(values[0])
+        if values: 
+            self.combo_alu_pago.set(values[0])
+        else:
+            self.combo_alu_pago.set("")
 
     def actualizar_tabla_pagos(self, datos):
         for item in self.tree_pagos.get_children():
@@ -318,6 +427,9 @@ class AppEscolar(ctk.CTk):
             # Convertir el booleano 1/0 a texto
             fila_lista = list(fila)
             fila_lista[4] = "Pagado" if fila_lista[4] else "Pendiente"
+            # Manejar registros antiguos sin fecha
+            if len(fila_lista) > 5 and fila_lista[5] is None:
+                fila_lista[5] = ""
             self.tree_pagos.insert("", "end", values=fila_lista)
 
     def solicitar_pago(self):
@@ -330,24 +442,77 @@ class AppEscolar(ctk.CTk):
     def solicitar_exportar_pagos(self):
         self.controller.exportar_pagos_csv()
 
-    def solicitar_morosos(self):
-        self.controller.mostrar_reporte_morosos()
+    def solicitar_busqueda_pagos(self):
+        termino = self.entry_busqueda_pagos.get()
+        self.controller.buscar_pagos(termino)
 
-    def mostrar_ventana_morosos(self, datos, mes):
+    def on_double_click_pago(self, event):
+        self.solicitar_modificar_pago()
+
+    def solicitar_morosos(self):
+        mes = self.combo_mes_reporte.get()
+        self.controller.mostrar_reporte_morosos(mes)
+
+    def solicitar_eliminar_pago(self):
+        selected = self.tree_pagos.selection()
+        if selected:
+            item = self.tree_pagos.item(selected[0])
+            id_pago = item['values'][0]
+            self.controller.eliminar_pago(id_pago)
+        else:
+            messagebox.showwarning("Aviso", "Seleccione un pago del historial para eliminar.")
+
+    def solicitar_modificar_pago(self):
+        selected = self.tree_pagos.selection()
+        if not selected:
+            messagebox.showwarning("Aviso", "Seleccione un pago del historial para modificar.")
+            return
+
+        item = self.tree_pagos.item(selected[0])
+        values = item['values']
+        id_pago = values[0]
+        monto = values[2]
+        mes = values[3]
+
         top = ctk.CTkToplevel(self)
-        top.title(f"Reporte de Morosidad - {mes}")
-        top.geometry("700x400")
+        top.title("Modificar Pago")
+        top.geometry("300x250")
+        top.grab_set()
+
+        ctk.CTkLabel(top, text="Mes:").pack(pady=5)
+        combo_mes = ctk.CTkComboBox(top, values=self.controller.MESES)
+        combo_mes.set(mes)
+        combo_mes.pack(pady=5)
+
+        ctk.CTkLabel(top, text="Monto:").pack(pady=5)
+        entry_monto = ctk.CTkEntry(top)
+        entry_monto.insert(0, str(monto))
+        entry_monto.pack(pady=5)
+
+        ctk.CTkButton(top, text="Guardar Cambios", command=lambda: self.controller.modificar_pago(id_pago, entry_monto.get(), combo_mes.get(), top)).pack(pady=20)
+
+    def mostrar_ventana_morosos(self, datos, titulo):
+        if self.ventana_morosos is not None and self.ventana_morosos.winfo_exists():
+            self.ventana_morosos.destroy()
+
+        self.ventana_morosos = ctk.CTkToplevel(self)
+        top = self.ventana_morosos
+        top.title(titulo)
+        top.geometry("900x450") # Ventana más ancha para ver los meses
         
-        ctk.CTkLabel(top, text=f"Alumnos pendientes de pago: {mes}", font=("Arial", 16, "bold")).pack(pady=10)
-        ctk.CTkButton(top, text="Exportar Lista a CSV", fg_color="green", command=lambda: self.controller.exportar_morosos_csv(datos, mes)).pack(pady=5)
+        ctk.CTkLabel(top, text=titulo, font=("Arial", 16, "bold")).pack(pady=10)
+        ctk.CTkButton(top, text="Exportar Lista a CSV", fg_color="green", command=lambda: self.controller.exportar_morosos_csv(datos, titulo)).pack(pady=5)
         
         style = ttk.Style()
-        columns = ("ID", "Alumno", "Grado", "Apoderado", "Teléfono")
+        columns = ("ID", "Alumno", "Grado", "Apoderado", "Teléfono", "Meses Adeudados")
         tree = ttk.Treeview(top, columns=columns, show="headings")
         
         for col in columns:
             tree.heading(col, text=col)
-            tree.column(col, width=120)
+            if col == "Meses Adeudados":
+                tree.column(col, width=300) # Más espacio para la lista de meses
+            else:
+                tree.column(col, width=100)
             
         tree.pack(expand=True, fill="both", padx=10, pady=10)
         

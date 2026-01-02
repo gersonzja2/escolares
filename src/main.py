@@ -4,19 +4,55 @@ from tkinter import messagebox, filedialog
 import csv
 import re
 from datetime import datetime
+import threading
+import shutil
+from typing import List, Optional, Any
 
 class SchoolController:
+    MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
     def __init__(self):
         self.db = SchoolDB()
         # Pasamos 'self' (el controlador) a la vista
         self.view = AppEscolar(controller=self)
         
+        # Cargar configuración
+        self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Escuela Modelo"
+        
         # Cargar datos iniciales
         self.actualizar_apoderados()
         self.actualizar_alumnos()
         self.actualizar_pagos_ui()
+        self.actualizar_dashboard()
         
         self.view.mainloop()
+
+    def actualizar_dashboard(self):
+        mes_actual = self.MESES[datetime.now().month - 1]
+        total_alumnos, ingresos = self.db.obtener_estadisticas_dashboard(mes_actual)
+        self.view.actualizar_tarjetas_dashboard(total_alumnos, ingresos, mes_actual)
+
+    def guardar_ajustes(self, nombre_escuela):
+        if not nombre_escuela:
+            messagebox.showerror("Error", "El nombre de la escuela no puede estar vacío")
+            return
+        self.db.guardar_configuracion("nombre_escuela", nombre_escuela)
+        self.nombre_escuela = nombre_escuela
+        self.view.mostrar_mensaje_estado("Configuración guardada correctamente")
+
+    def realizar_backup(self):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".db",
+            filetypes=[("SQLite DB", "*.db")],
+            initialfile=f"backup_escolares_{datetime.now().strftime('%Y%m%d')}.db",
+            title="Guardar Copia de Seguridad"
+        )
+        if file_path:
+            try:
+                shutil.copy(self.db.db.db_path, file_path)
+                self.view.mostrar_mensaje_estado("Copia de seguridad creada con éxito")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo crear el backup: {e}")
 
     def actualizar_apoderados(self):
         # Actualizar combo en inscripción (lista simple)
@@ -31,7 +67,7 @@ class SchoolController:
         datos = self.db.obtener_estudiantes_completo()
         self.view.actualizar_tabla_alumnos(datos)
 
-    def buscar_alumnos(self, termino):
+    def buscar_alumnos(self, termino: str):
         if not termino:
             self.actualizar_alumnos()
             return
@@ -44,35 +80,57 @@ class SchoolController:
         pagos = self.db.obtener_historial_pagos()
         self.view.actualizar_tabla_pagos(pagos)
 
-    def guardar_apoderado(self, nombre, tel, email):
+    def buscar_pagos(self, termino: str):
+        if not termino:
+            self.actualizar_pagos_ui()
+            return
+        pagos = self.db.buscar_pagos(termino)
+        self.view.actualizar_tabla_pagos(pagos)
+
+    def guardar_apoderado(self, nombre: str, tel: str, email: str):
+        nombre = nombre.strip() if nombre else ""
+        tel = tel.strip() if tel else ""
+        email = email.strip() if email else ""
+
         if not nombre:
             messagebox.showerror("Error", "El nombre es obligatorio")
             return
+        
+        if tel and not re.match(r"^\+?[\d\s-]+$", tel):
+            messagebox.showerror("Error", "El teléfono contiene caracteres inválidos")
+            return
 
         # Validación de formato de email
-        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        if not self._validar_email(email):
             messagebox.showerror("Error", "El formato del email es inválido (ej: correo@dominio.com)")
             return
         
         self.db.agregar_apoderado(nombre, tel, email)
-        messagebox.showinfo("Éxito", "Apoderado guardado correctamente")
+        self.view.mostrar_mensaje_estado("Apoderado guardado correctamente")
         self.view.limpiar_form_apoderado()
         self.actualizar_apoderados() # Actualizar lista en pestaña inscripción
 
-    def editar_apoderado(self, id, nombre, tel, email, window):
+    def editar_apoderado(self, id: int, nombre: str, tel: str, email: str, window: Any):
+        nombre = nombre.strip() if nombre else ""
+        tel = tel.strip() if tel else ""
+        email = email.strip() if email else ""
+
         if not nombre:
             messagebox.showerror("Error", "El nombre es obligatorio")
             return
-        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        if tel and not re.match(r"^\+?[\d\s-]+$", tel):
+            messagebox.showerror("Error", "El teléfono contiene caracteres inválidos")
+            return
+        if not self._validar_email(email):
             messagebox.showerror("Error", "El formato del email es inválido")
             return
             
         self.db.actualizar_apoderado(id, nombre, tel, email)
-        messagebox.showinfo("Éxito", "Apoderado actualizado correctamente")
+        self.view.mostrar_mensaje_estado("Apoderado actualizado correctamente")
         window.destroy()
         self.actualizar_apoderados()
 
-    def eliminar_apoderado(self, id_apoderado):
+    def eliminar_apoderado(self, id_apoderado: int):
         if self.db.verificar_dependencia_apoderado(id_apoderado):
             messagebox.showerror("Error", "No se puede eliminar el apoderado porque tiene alumnos inscritos. Elimine o reasigne a los alumnos primero.")
             return
@@ -81,7 +139,10 @@ class SchoolController:
             self.db.eliminar_apoderado(id_apoderado)
             self.actualizar_apoderados()
 
-    def inscribir_alumno(self, nombre, grado, apo_id):
+    def inscribir_alumno(self, nombre: str, grado: str, apo_id: int):
+        nombre = nombre.strip() if nombre else ""
+        grado = grado.strip() if grado else ""
+
         if not nombre:
             messagebox.showerror("Error", "El nombre del alumno es obligatorio")
             return
@@ -91,32 +152,37 @@ class SchoolController:
             return
             
         self.db.agregar_estudiante(nombre, grado, apo_id)
-        messagebox.showinfo("Éxito", "Alumno inscrito correctamente")
+        self.view.mostrar_mensaje_estado("Alumno inscrito correctamente")
         self.view.limpiar_form_inscripcion()
         self.actualizar_alumnos()
         self.actualizar_pagos_ui() # Actualizar lista en pagos también
+        self.actualizar_dashboard()
 
-    def preparar_edicion_alumno(self, id_alumno):
+    def preparar_edicion_alumno(self, id_alumno: int):
         estudiante = self.db.obtener_estudiante_por_id(id_alumno)
         if estudiante:
             self.view.abrir_ventana_edicion_alumno(estudiante[0])
 
-    def editar_alumno(self, id, nombre, grado, apo_id, window):
+    def editar_alumno(self, id: int, nombre: str, grado: str, apo_id: int, window: Any):
+        nombre = nombre.strip() if nombre else ""
+        grado = grado.strip() if grado else ""
+
         if not nombre or not apo_id:
             messagebox.showerror("Error", "Faltan datos o apoderado inválido")
             return
         self.db.actualizar_estudiante(id, nombre, grado, apo_id)
-        messagebox.showinfo("Éxito", "Alumno actualizado correctamente")
+        self.view.mostrar_mensaje_estado("Alumno actualizado correctamente")
         window.destroy()
         self.actualizar_alumnos()
 
-    def eliminar_alumno(self, id_alumno):
+    def eliminar_alumno(self, id_alumno: int):
         if messagebox.askyesno("Confirmar", "¿Está seguro de eliminar este alumno?"):
             self.db.eliminar_estudiante(id_alumno)
             self.actualizar_alumnos()
             self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
 
-    def registrar_pago(self, estudiante_id, monto, mes):
+    def registrar_pago(self, estudiante_id: int, monto: str, mes: str):
         if not estudiante_id or not monto or not mes:
             messagebox.showerror("Error", "Todos los campos son obligatorios")
             return
@@ -126,34 +192,87 @@ class SchoolController:
             if monto_float <= 0:
                 messagebox.showerror("Error", "El monto debe ser un número positivo mayor a 0")
                 return
+            
+            if self.db.verificar_pago_existente(estudiante_id, mes):
+                messagebox.showwarning("Aviso", f"El pago de {mes} ya está registrado para este alumno.")
+                return
+
             self.db.registrar_pago(estudiante_id, monto_float, mes)
-            messagebox.showinfo("Éxito", "Pago registrado correctamente")
+            self.view.mostrar_mensaje_estado("Pago registrado correctamente")
             self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
         except ValueError:
             messagebox.showerror("Error", "El monto debe ser un número válido")
 
-    def mostrar_reporte_morosos(self):
-        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-        mes_actual = meses[datetime.now().month - 1]
+    def eliminar_pago(self, id_pago: int):
+        if messagebox.askyesno("Confirmar", "¿Está seguro de eliminar este registro de pago?"):
+            self.db.eliminar_pago(id_pago)
+            self.view.mostrar_mensaje_estado("Pago eliminado correctamente")
+            self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
+
+    def modificar_pago(self, id_pago: int, monto: str, mes: str, window: Any):
+        try:
+            monto_float = float(monto)
+            if monto_float <= 0:
+                messagebox.showerror("Error", "El monto debe ser positivo")
+                return
+            
+            self.db.actualizar_pago(id_pago, monto_float, mes)
+            self.view.mostrar_mensaje_estado("Pago actualizado correctamente")
+            window.destroy()
+            self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
+        except ValueError:
+            messagebox.showerror("Error", "Monto inválido")
+
+    def mostrar_reporte_morosos(self, mes_corte: str):
+        # Lógica de ciclo escolar: Marzo (índice 2) a Diciembre
+        idx_inicio_clases = 2 
+        try:
+            mes_actual_idx = self.MESES.index(mes_corte)
+        except ValueError:
+            mes_actual_idx = datetime.now().month - 1
         
-        datos = self.db.obtener_morosos(mes_actual)
-        self.view.mostrar_ventana_morosos(datos, mes_actual)
+        if mes_actual_idx < idx_inicio_clases:
+             messagebox.showinfo("Aviso", "El ciclo escolar comienza en Marzo. No hay reporte de morosidad disponible para Enero/Febrero.")
+             return
+
+        # Lista de meses que DEBERÍAN estar pagados a la fecha (ej: Marzo, Abril, Mayo...)
+        meses_requeridos = self.MESES[idx_inicio_clases : mes_actual_idx + 1]
+        
+        estudiantes = self.db.obtener_estudiantes_completo()
+        pagos_raw = self.db.obtener_pagos_todos()
+        
+        # Crear mapa de pagos: { id_estudiante: {'Marzo', 'Abril'} }
+        pagos_map = {}
+        for pid, mes in pagos_raw:
+            if pid not in pagos_map:
+                pagos_map[pid] = set()
+            pagos_map[pid].add(mes)
+            
+        lista_morosos = []
+        for est in estudiantes:
+            eid, nombre, grado, apo, tel = est
+            pagados = pagos_map.get(eid, set())
+            
+            # Calcular meses faltantes
+            deuda = [m for m in meses_requeridos if m not in pagados]
+            
+            if deuda:
+                deuda_str = ", ".join(deuda)
+                # Agregamos la columna de meses adeudados al final
+                lista_morosos.append((eid, nombre, grado, apo, tel, deuda_str))
+
+        titulo = f"Morosidad Acumulada (Marzo - {mes_corte})"
+        self.view.mostrar_ventana_morosos(lista_morosos, titulo)
 
     def exportar_alumnos_csv(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], title="Guardar lista de alumnos")
-        if not file_path: return
-        
         datos = self.db.obtener_estudiantes_completo()
-        try:
-            with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
-                writer = csv.writer(file)
-                writer.writerow(["ID", "Nombre Alumno", "Grado", "Nombre Apoderado", "Teléfono"])
-                writer.writerows(datos)
-            messagebox.showinfo("Éxito", "Lista de alumnos exportada correctamente")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}")
+        headers = ["ID", "Nombre Alumno", "Grado", "Nombre Apoderado", "Teléfono"]
+        self._exportar_csv(datos, headers, "Lista_Alumnos.csv", "Guardar lista de alumnos")
 
-    def generar_ficha_alumno_pdf(self, id_alumno):
+    def generar_ficha_alumno_pdf(self, id_alumno: int):
         try:
             from reportlab.pdfgen import canvas
             from reportlab.lib.pagesizes import letter
@@ -175,61 +294,77 @@ class SchoolController:
         file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"Ficha_{nombre_alu}.pdf", title="Guardar Ficha de Alumno")
         if not file_path: return
 
-        try:
-            c = canvas.Canvas(file_path, pagesize=letter)
-            width, height = letter
-            
-            c.setFont("Helvetica-Bold", 20)
-            c.drawString(50, height - 50, "Ficha del Estudiante")
-            
-            c.setFont("Helvetica", 12)
-            c.drawString(50, height - 100, f"Nombre del Alumno: {nombre_alu}")
-            c.drawString(50, height - 120, f"Grado/Curso: {grado}")
-            
-            c.line(50, height - 140, width - 50, height - 140)
-            
-            c.setFont("Helvetica-Bold", 14)
-            c.drawString(50, height - 170, "Información del Apoderado")
-            
-            c.setFont("Helvetica", 12)
-            c.drawString(50, height - 200, f"Nombre: {nombre_apo}")
-            c.drawString(50, height - 220, f"Teléfono: {tel_apo}")
-            c.drawString(50, height - 240, f"Email: {email_apo}")
-            
-            c.setFont("Helvetica-Oblique", 10)
-            c.drawString(50, 50, "Generado por Sistema de Gestión Escolar")
-            
-            c.save()
-            messagebox.showinfo("Éxito", "Ficha PDF generada correctamente")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo generar el PDF: {e}")
+        def worker():
+            try:
+                c = canvas.Canvas(file_path, pagesize=letter)
+                width, height = letter
+                
+                c.setFont("Helvetica-Bold", 20)
+                c.drawString(50, height - 50, "Ficha del Estudiante")
+                
+                c.setFont("Helvetica", 12)
+                c.drawString(50, height - 100, f"Nombre del Alumno: {nombre_alu}")
+                c.drawString(50, height - 120, f"Grado/Curso: {grado}")
+                
+                c.line(50, height - 140, width - 50, height - 140)
+                
+                c.setFont("Helvetica-Bold", 14)
+                c.drawString(50, height - 170, "Información del Apoderado")
+                
+                c.setFont("Helvetica", 12)
+                c.drawString(50, height - 200, f"Nombre: {nombre_apo}")
+                c.drawString(50, height - 220, f"Teléfono: {tel_apo}")
+                c.drawString(50, height - 240, f"Email: {email_apo}")
+                
+                c.setFont("Helvetica-Oblique", 10)
+                c.drawString(50, 50, f"Generado por Sistema de Gestión Escolar - {self.nombre_escuela}")
+                
+                c.save()
+                self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Ficha PDF generada correctamente"))
+            except Exception as e:
+                self.view.after(0, lambda: messagebox.showerror("Error", f"No se pudo generar el PDF: {e}"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def exportar_pagos_csv(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], title="Guardar historial de pagos")
-        if not file_path: return
-        
         datos = self.db.obtener_historial_pagos()
-        try:
-            with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
-                writer = csv.writer(file)
-                writer.writerow(["ID Pago", "Alumno", "Monto", "Mes", "Pagado (1=Sí, 0=No)"])
-                writer.writerows(datos)
-            messagebox.showinfo("Éxito", "Historial de pagos exportado correctamente")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}")
+        headers = ["ID Pago", "Alumno", "Monto", "Mes", "Pagado (1=Sí, 0=No)", "Fecha Pago"]
+        self._exportar_csv(datos, headers, "Historial_Pagos.csv", "Guardar historial de pagos")
 
-    def exportar_morosos_csv(self, datos, mes):
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialfile=f"Morosos_{mes}.csv", title="Guardar reporte de morosos")
-        if not file_path: return
-        
-        try:
-            with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
-                writer = csv.writer(file)
-                writer.writerow(["ID Alumno", "Nombre", "Grado", "Apoderado", "Teléfono"])
-                writer.writerows(datos)
-            messagebox.showinfo("Éxito", "Reporte de morosos exportado correctamente")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}")
+    def exportar_morosos_csv(self, datos: List[Any], titulo_reporte: str):
+        headers = ["ID Alumno", "Nombre", "Grado", "Apoderado", "Teléfono", "Meses Adeudados"]
+        # Limpiamos el título para usarlo de nombre de archivo
+        nombre_archivo = f"Reporte_{titulo_reporte.replace(' ', '_').replace('(', '').replace(')', '')}.csv"
+        self._exportar_csv(datos, headers, nombre_archivo, "Guardar reporte de morosos")
+
+    # --- Métodos Auxiliares ---
+
+    def _validar_email(self, email: str) -> bool:
+        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return False
+        return True
+
+    def _exportar_csv(self, datos: List[Any], headers: List[str], default_name: str, title: str):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv", 
+            filetypes=[("CSV files", "*.csv")], 
+            initialfile=default_name, 
+            title=title
+        )
+        if not file_path: 
+            return
+
+        def worker():
+            try:
+                with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(headers)
+                    writer.writerows(datos)
+                self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Archivo exportado correctamente"))
+            except Exception as e:
+                self.view.after(0, lambda: messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
 if __name__ == "__main__":
     controller = SchoolController()
