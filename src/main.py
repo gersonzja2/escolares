@@ -505,54 +505,6 @@ class SchoolController:
             
         self._ejecutar_envio_whatsapp(tel, "Hola! Este es un mensaje de prueba de tu Sistema Escolar 🎓")
 
-    def enviar_recordatorio_morosos_masivo(self):
-        """Busca todos los alumnos con deuda y envía recordatorios a sus apoderados."""
-        estudiantes = self.db.obtener_estudiantes_completo()
-        morosos = []
-        
-        # Filtrar quiénes tienen deuda
-        for est in estudiantes:
-            # est: id, nombre, grado, fecha, nombre_apo, tel, email
-            id_alu, nombre_alu, _, _, nombre_apo, tel, _ = est
-            deuda = self._calcular_deuda_alumno(id_alu)
-            if deuda and tel:
-                morosos.append((nombre_apo, tel, nombre_alu, deuda))
-        
-        if not morosos:
-            messagebox.showinfo("Info", "No se encontraron alumnos con deuda y teléfono registrado.")
-            return
-
-        if not messagebox.askyesno("Confirmar Cobranza Masiva", f"Se encontraron {len(morosos)} alumnos morosos con teléfono.\n¿Desea enviar los recordatorios por WhatsApp?"):
-            return
-
-        self.view.mostrar_mensaje_estado("Iniciando cobranza masiva...")
-        
-        def worker():
-            enviados = 0
-            errores = 0
-            for nombre_apo, tel, nombre_alu, deuda in morosos:
-                # Limpieza profunda del teléfono
-                tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
-                if not tel.startswith("+"):
-                    errores += 1
-                    continue
-                
-                deuda_str = ", ".join(deuda)
-                mensaje = (f"Estimado/a {nombre_apo}, le recordamos que el alumno {nombre_alu} "
-                           f"tiene pendientes: {deuda_str}. Favor regularizar. Atte, {self.nombre_escuela}")
-                
-                if WhatsAppService.enviar_mensaje(tel, mensaje):
-                    enviados += 1
-                else:
-                    errores += 1
-
-                time.sleep(12)
-            
-            self.view.after(0, lambda: messagebox.showinfo("Reporte Cobranza", f"Proceso finalizado.\nEnviados: {enviados}\nFallidos: {errores}"))
-            self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Cobranza masiva finalizada."))
-
-        threading.Thread(target=worker, daemon=True).start()
-
     def _worker_recibo(self, file_path, datos_pago):
         try:
             ReportService.generar_recibo_pago_pdf(file_path, datos_pago, self.nombre_escuela)

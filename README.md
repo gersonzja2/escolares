@@ -10,7 +10,6 @@ Aplicación de escritorio desarrollada en Python para la administración de escu
 *   **Dashboard:** Visualización gráfica de alumnos por grado e ingresos mensuales.
 *   **Automatización de WhatsApp:**
     *   Envío de recordatorios de pago individuales.
-    *   Cobranza masiva a todos los morosos con un clic.
     *   Anuncios generales a todos los apoderados.
     *   **Configuración de espera ajustable** para conexiones lentas.
 *   **Seguridad:** Copias de seguridad (backup) automáticas al iniciar.

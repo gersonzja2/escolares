@@ -114,7 +114,6 @@ class AppEscolar(ctk.CTk):
         
         ctk.CTkLabel(frame_comms, text="Comunicaciones WhatsApp:", font=("Arial", 14, "bold")).pack(side="left", padx=10)
         ctk.CTkButton(frame_comms, text="📢 Anuncio General", fg_color="#25D366", text_color="white", hover_color="#128C7E", command=self.controller.enviar_anuncio_general).pack(side="left", padx=5)
-        ctk.CTkButton(frame_comms, text="💲 Cobranza Masiva", fg_color="#128C7E", text_color="white", hover_color="#075E54", command=self.controller.enviar_recordatorio_morosos_masivo).pack(side="left", padx=5)
 
         # Gráfico de Alumnos por Grado
         self.frame_grafico = ctk.CTkFrame(self.tab_inicio, fg_color="transparent")

@@ -9,6 +9,12 @@ __pycache__/
 venv/
 env/
 
+# Archivos de logs
+*.log
+
+#archivos de texto
+*.txt
+
 # IDEs y Sistema
 .vscode/
 .idea/
