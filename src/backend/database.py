@@ -1,12 +1,20 @@
 import sqlite3
 import os
+import sys
 from datetime import datetime
 
 class SchoolDB:
     def __init__(self, db_name="escolares.db"):
-        # Asegurar que la DB se cree en el directorio correcto
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.db_path = os.path.join(base_dir, "..", db_name)
+        # Detectar si estamos corriendo como ejecutable (PyInstaller)
+        if getattr(sys, 'frozen', False):
+            # Si es exe, guardar la DB en la misma carpeta del ejecutable
+            base_dir = os.path.dirname(sys.executable)
+            self.db_path = os.path.join(base_dir, db_name)
+        else:
+            # Si es script (desarrollo), guardar en la carpeta raíz del proyecto
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            self.db_path = os.path.join(base_dir, "..", db_name)
+            
         self.init_db()
 
     def _conectar(self):
@@ -123,6 +131,11 @@ class SchoolDB:
     def verificar_dependencia_apoderado(self, apoderado_id):
         # Retorna True si el apoderado tiene estudiantes asignados
         result = self.obtener_datos("SELECT COUNT(*) FROM estudiantes WHERE apoderado_id = ?", (apoderado_id,))
+        return result[0][0] > 0
+
+    def verificar_estudiante_existente(self, nombre, grado):
+        # Retorna True si ya existe un alumno con el mismo nombre exacto en el mismo grado
+        result = self.obtener_datos("SELECT COUNT(*) FROM estudiantes WHERE nombre = ? AND grado = ?", (nombre, grado))
         return result[0][0] > 0
 
     def agregar_estudiante(self, nombre, grado, apoderado_id):

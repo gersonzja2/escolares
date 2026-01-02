@@ -11,7 +11,9 @@ Aplicación de escritorio desarrollada en Python para la administración eficien
 *   **Reportes y Exportación:**
     *   Generación de fichas de alumno en formato **PDF**.
     *   Exportación de listas de alumnos, historiales de pago y reportes de morosidad a **CSV** (Excel).
-*   **Seguridad:** Sistema integrado para realizar copias de seguridad (Backup) de la base de datos.
+*   **Seguridad y Mantenimiento:**
+    *   **Respaldo Automático:** El sistema crea copias de seguridad automáticas (rotación de las últimas 10) en la carpeta `backups/` cada vez que se inicia el programa.
+    *   **Zona de Peligro:** Funcionalidades para el borrado masivo de datos (pagos, alumnos, apoderados) protegidas con confirmación.
 
 ## Requisitos del Sistema
 

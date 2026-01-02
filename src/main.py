@@ -7,13 +7,30 @@ from datetime import datetime
 import threading
 import shutil
 from typing import List, Optional, Any
+import sys
+import os
+import json
 
 class SchoolController:
     MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
     INICIO_CLASES_IDX = 2  # Marzo es el índice 2
+    CONFIG_FILE = "config.json"
+    BACKUP_DIR = "backups"
 
     def __init__(self):
-        self.db = SchoolDB()
+        # 1. Cargar configuración de persistencia (última DB usada)
+        self.app_config = self._cargar_config_app()
+        last_db = self.app_config.get("last_db_path")
+        
+        if last_db and os.path.exists(last_db):
+            self.db = SchoolDB(last_db)
+        else:
+            self.db = SchoolDB() # Usa la por defecto si no hay config
+            
+        # 2. Guardar la ruta actual y crear backup automático de seguridad
+        self._guardar_config_app(self.db.db_path)
+        self._crear_backup_automatico()
+
         # Cargar configuración
         self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Escuela Modelo"
         self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
@@ -79,6 +96,10 @@ class SchoolController:
             # 1. Conectar a la nueva DB
             self.db = SchoolDB(db_path)
             
+            # Guardar preferencia y asegurar copia
+            self._guardar_config_app(self.db.db_path)
+            self._crear_backup_automatico()
+
             # 2. Recargar configuración
             self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Nueva Escuela"
             self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
@@ -205,6 +226,10 @@ class SchoolController:
             
         if not apo_id:
             messagebox.showerror("Error", "Debe seleccionar un apoderado para inscribir al alumno")
+            return
+
+        if self.db.verificar_estudiante_existente(nombre, grado):
+            messagebox.showerror("Error", f"El alumno '{nombre}' ya está inscrito en el grado '{grado}'.")
             return
             
         self.db.agregar_estudiante(nombre, grado, apo_id)
@@ -340,13 +365,14 @@ class SchoolController:
         file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"Ficha_{nombre_alu}.pdf", title="Guardar Ficha de Alumno")
         if not file_path: return
 
+        self.view.configure(cursor="watch") # Cambiar cursor a espera
         def worker():
             try:
                 pagos = self.db.obtener_pagos_alumno(id_alumno)
                 ReportService.generar_ficha_alumno_pdf(file_path, datos_alumno, pagos, self.nombre_escuela)
-                self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Ficha PDF generada correctamente"))
+                self.view.after(0, lambda: self._finalizar_tarea_visual("Ficha PDF generada correctamente"))
             except Exception as e:
-                self.view.after(0, lambda: messagebox.showerror("Error", f"No se pudo generar el PDF: {e}"))
+                self.view.after(0, lambda: self._finalizar_tarea_visual(f"Error: {e}", es_error=True))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -387,6 +413,55 @@ class SchoolController:
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
+    # --- Métodos de Persistencia y Backup Automático ---
+
+    def _cargar_config_app(self):
+        try:
+            if os.path.exists(self.CONFIG_FILE):
+                with open(self.CONFIG_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return {}
+
+    def _guardar_config_app(self, db_path):
+        try:
+            config = {"last_db_path": os.path.abspath(db_path)}
+            with open(self.CONFIG_FILE, 'w') as f:
+                json.dump(config, f)
+        except Exception as e:
+            print(f"Error guardando config: {e}")
+
+    def _crear_backup_automatico(self):
+        """Crea una copia de seguridad y mantiene solo las últimas 10."""
+        try:
+            if not os.path.exists(self.db.db_path): return
+            
+            # Crear carpeta backups si no existe
+            if not os.path.exists(self.BACKUP_DIR):
+                os.makedirs(self.BACKUP_DIR)
+            
+            # Nombre: original_auto_YYYYMMDD_HHMMSS.db
+            nombre_base = os.path.basename(self.db.db_path)
+            nombre_sin_ext = os.path.splitext(nombre_base)[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{nombre_sin_ext}_auto_{timestamp}.db"
+            backup_path = os.path.join(self.BACKUP_DIR, backup_name)
+            
+            shutil.copy(self.db.db_path, backup_path)
+
+            # Limpieza: Mantener solo los 10 archivos más recientes
+            archivos = [os.path.join(self.BACKUP_DIR, f) for f in os.listdir(self.BACKUP_DIR) if f.endswith(".db")]
+            # Ordenar por fecha de modificación (el más viejo primero)
+            archivos.sort(key=os.path.getmtime)
+            
+            while len(archivos) > 10:
+                os.remove(archivos[0]) # Borrar el más viejo
+                archivos.pop(0)
+                
+        except Exception as e:
+            print(f"Error creando backup automático: {e}")
+
     # --- Métodos Auxiliares ---
 
     def _validar_email(self, email: str) -> bool:
@@ -405,14 +480,23 @@ class SchoolController:
         if not file_path: 
             return
 
+        self.view.configure(cursor="watch") # Cambiar cursor a espera
         def worker():
             try:
                 ReportService.exportar_csv(file_path, headers, datos)
-                self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Archivo exportado correctamente"))
+                self.view.after(0, lambda: self._finalizar_tarea_visual("Archivo exportado correctamente"))
             except Exception as e:
-                self.view.after(0, lambda: messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}"))
+                self.view.after(0, lambda: self._finalizar_tarea_visual(f"Error: {e}", es_error=True))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _finalizar_tarea_visual(self, mensaje, es_error=False):
+        """Restaura el cursor y muestra mensaje."""
+        self.view.configure(cursor="")
+        if es_error:
+            messagebox.showerror("Error", mensaje)
+        else:
+            self.view.mostrar_mensaje_estado(mensaje)
 
 if __name__ == "__main__":
     controller = SchoolController()

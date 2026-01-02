@@ -73,7 +73,9 @@ Aquí encontrará un resumen visual del estado del colegio.
     *   **Crear Nueva Escuela**: Crea una base de datos vacía para administrar otro colegio por separado.
     *   **Abrir Otra Escuela**: Cambia la base de datos actual por otra existente.
 4.  **Respaldo (Backup)**: Crea una copia de seguridad de todos sus datos actuales.
-5.  **Zona de Peligro**: Botones para borrar masivamente todos los pagos, alumnos o apoderados. *Úselo con precaución*.
+    *   *Nota: El sistema también crea respaldos automáticos en la carpeta `backups/` (ubicada junto al ejecutable) cada vez que se inicia.*
+5.  **Zona de Peligro**: Botones para borrar masivamente todos los pagos, alumnos o apoderados.
+    *   **Advertencia**: Estas acciones no se pueden deshacer. Úselas solo si necesita reiniciar el sistema o limpiar datos de prueba.
 
 ---
 
@@ -84,4 +86,4 @@ Aquí encontrará un resumen visual del estado del colegio.
 *   **¿Dónde se guardan los archivos PDF o CSV?**
     *   El sistema le preguntará dónde guardarlos cada vez que genere uno.
 *   **¿Cómo recupero una copia de seguridad?**
-    *   Use la opción "Abrir Otra Escuela" en Configuración y seleccione su archivo de respaldo.
+    *   Use la opción "Abrir Otra Escuela" en Configuración y seleccione su archivo de respaldo (puede buscar en la carpeta `backups` generada automáticamente).
