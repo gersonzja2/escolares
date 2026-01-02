@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
+import tkinter as tk
 from datetime import datetime
 
 # Intentar importar matplotlib para gráficos
@@ -107,10 +108,18 @@ class AppEscolar(ctk.CTk):
 
         ctk.CTkButton(frame_acciones, text="↻", width=40, fg_color="gray", command=self.solicitar_actualizar_dashboard).pack(side="left", padx=5)
 
+        # Centro de Comunicaciones (WhatsApp)
+        frame_comms = ctk.CTkFrame(self.tab_inicio, fg_color="transparent")
+        frame_comms.grid(row=3, column=0, columnspan=2, pady=10)
+        
+        ctk.CTkLabel(frame_comms, text="Comunicaciones WhatsApp:", font=("Arial", 14, "bold")).pack(side="left", padx=10)
+        ctk.CTkButton(frame_comms, text="📢 Anuncio General", fg_color="#25D366", text_color="white", hover_color="#128C7E", command=self.controller.enviar_anuncio_general).pack(side="left", padx=5)
+        ctk.CTkButton(frame_comms, text="💲 Cobranza Masiva", fg_color="#128C7E", text_color="white", hover_color="#075E54", command=self.controller.enviar_recordatorio_morosos_masivo).pack(side="left", padx=5)
+
         # Gráfico de Alumnos por Grado
         self.frame_grafico = ctk.CTkFrame(self.tab_inicio, fg_color="transparent")
-        self.frame_grafico.grid(row=3, column=0, columnspan=2, pady=20, sticky="nsew")
-        self.tab_inicio.grid_rowconfigure(3, weight=1)
+        self.frame_grafico.grid(row=4, column=0, columnspan=2, pady=20, sticky="nsew")
+        self.tab_inicio.grid_rowconfigure(4, weight=1)
         
         self.actualizar_grafico_alumnos()
 
@@ -156,7 +165,9 @@ class AppEscolar(ctk.CTk):
         self.controller.actualizar_dashboard(mes)
 
     def setup_ui_configuracion(self):
-        frame = self.tab_config
+        # Usamos un ScrollableFrame para asegurar que se pueda bajar hasta la zona de peligro
+        frame = ctk.CTkScrollableFrame(self.tab_config)
+        frame.pack(fill="both", expand=True, padx=5, pady=5)
         
         ctk.CTkLabel(frame, text="Configuración General", font=("Arial", 20, "bold")).pack(pady=20)
         
@@ -167,6 +178,18 @@ class AppEscolar(ctk.CTk):
         if hasattr(self.controller, 'nombre_escuela'):
             self.entry_nombre_escuela.insert(0, self.controller.nombre_escuela)
             
+        ctk.CTkLabel(frame, text="Teléfono Administrador:").pack(pady=5)
+        self.entry_admin_tel = ctk.CTkEntry(frame, width=300)
+        self.entry_admin_tel.pack(pady=5)
+        if hasattr(self.controller, 'admin_telefono'):
+            self.entry_admin_tel.insert(0, self.controller.admin_telefono)
+
+        ctk.CTkLabel(frame, text="Día de Cobranza Mensual (1-31):").pack(pady=5)
+        self.entry_dia_cobranza = ctk.CTkEntry(frame, width=100)
+        self.entry_dia_cobranza.pack(pady=5)
+        if hasattr(self.controller, 'dia_cobranza'):
+            self.entry_dia_cobranza.insert(0, str(self.controller.dia_cobranza))
+
         self.switch_grafico = ctk.CTkSwitch(frame, text="Mostrar Gráfico en Dashboard")
         self.switch_grafico.pack(pady=5)
         if getattr(self.controller, 'mostrar_grafico', True):
@@ -224,9 +247,13 @@ class AppEscolar(ctk.CTk):
     def cambiar_tema(self, new_mode):
         ctk.set_appearance_mode(new_mode)
 
-    def actualizar_ui_configuracion(self, nombre_escuela, mostrar_grafico):
+    def actualizar_ui_configuracion(self, nombre_escuela, mostrar_grafico, admin_tel, dia_cobranza):
         self.entry_nombre_escuela.delete(0, 'end')
         self.entry_nombre_escuela.insert(0, nombre_escuela)
+        self.entry_admin_tel.delete(0, 'end')
+        self.entry_admin_tel.insert(0, admin_tel)
+        self.entry_dia_cobranza.delete(0, 'end')
+        self.entry_dia_cobranza.insert(0, str(dia_cobranza))
         if mostrar_grafico:
             self.switch_grafico.select()
         else:
@@ -383,6 +410,9 @@ class AppEscolar(ctk.CTk):
         
         self.tree_alumnos.grid(row=1, column=0, sticky="nsew")
         self.tree_alumnos.bind("<Double-1>", self.on_double_click_alumno)
+        
+        self.crear_menu_alumnos()
+        self.tree_alumnos.bind("<Button-3>", self.mostrar_menu_alumnos)
 
     def on_double_click_alumno(self, event):
         item = self.tree_alumnos.selection()
@@ -390,6 +420,23 @@ class AppEscolar(ctk.CTk):
         # Obtenemos solo el ID del treeview, el resto lo pedimos a la DB para tener el ID del apoderado correcto
         id_alumno = self.tree_alumnos.item(item, "values")[0]
         self.controller.preparar_edicion_alumno(id_alumno)
+
+    def crear_menu_alumnos(self):
+        self.menu_alumnos = tk.Menu(self, tearoff=0)
+        self.menu_alumnos.add_command(label="📱 Enviar Recordatorio WhatsApp", command=self.accion_whatsapp_alumno)
+
+    def mostrar_menu_alumnos(self, event):
+        try:
+            self.menu_alumnos.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu_alumnos.grab_release()
+
+    def accion_whatsapp_alumno(self):
+        selected = self.tree_alumnos.selection()
+        if selected:
+            item = self.tree_alumnos.item(selected[0])
+            id_alumno = item['values'][0]
+            self.controller.enviar_recordatorio_pago(id_alumno)
 
     def abrir_ventana_edicion_alumno(self, datos_alumno):
         # datos_alumno viene de la DB: (id, nombre, grado, apoderado_id, fecha_registro)
@@ -482,7 +529,12 @@ class AppEscolar(ctk.CTk):
             self.controller.eliminar_alumno(id_alumno)
 
     def solicitar_guardar_config(self):
-        self.controller.guardar_ajustes(self.entry_nombre_escuela.get(), self.switch_grafico.get())
+        self.controller.guardar_ajustes(
+            self.entry_nombre_escuela.get(), 
+            self.switch_grafico.get(),
+            self.entry_admin_tel.get(),
+            self.entry_dia_cobranza.get()
+        )
 
     def setup_ui_pagos(self):
         frame = self.tab_pagos

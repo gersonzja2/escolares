@@ -1,7 +1,9 @@
 from backend.database import SchoolDB
 from backend.services import ReportService
+from backend.whatsapp_service import WhatsAppService
 from frontend.interfaz import AppEscolar
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, simpledialog
+import time
 import re
 from datetime import datetime
 import threading
@@ -34,6 +36,8 @@ class SchoolController:
         # Cargar configuración
         self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Escuela Modelo"
         self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
+        self.admin_telefono = self.db.obtener_configuracion("admin_telefono") or ""
+        self.dia_cobranza = int(self.db.obtener_configuracion("dia_cobranza") or "5")
         
         # Pasamos 'self' (el controlador) a la vista
         self.view = AppEscolar(controller=self)
@@ -54,20 +58,35 @@ class SchoolController:
             mes_actual = mes_seleccionado
         else:
             mes_actual = self.MESES[datetime.now().month - 1]
+        
         total_alumnos, ingresos = self.db.obtener_estadisticas_dashboard(mes_actual)
         self.view.actualizar_tarjetas_dashboard(total_alumnos, ingresos, mes_actual)
         # Actualizar gráfico si existe
         if hasattr(self.view, 'actualizar_grafico_alumnos'):
             self.view.actualizar_grafico_alumnos()
 
-    def guardar_ajustes(self, nombre_escuela, mostrar_grafico):
+    def guardar_ajustes(self, nombre_escuela, mostrar_grafico, admin_tel, dia_cobranza):
         if not nombre_escuela:
             messagebox.showerror("Error", "El nombre de la escuela no puede estar vacío")
             return
+        
+        try:
+            dia = int(dia_cobranza)
+            if not (1 <= dia <= 31): raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "El día de cobranza debe ser un número entre 1 y 31")
+            return
+
         self.db.guardar_configuracion("nombre_escuela", nombre_escuela)
         self.db.guardar_configuracion("mostrar_grafico", "1" if mostrar_grafico else "0")
+        self.db.guardar_configuracion("admin_telefono", admin_tel)
+        self.db.guardar_configuracion("dia_cobranza", str(dia))
+        
         self.nombre_escuela = nombre_escuela
         self.mostrar_grafico = mostrar_grafico
+        self.admin_telefono = admin_tel
+        self.dia_cobranza = dia
+        
         self.view.mostrar_mensaje_estado("Configuración guardada correctamente")
         self.actualizar_dashboard()
 
@@ -103,10 +122,12 @@ class SchoolController:
             # 2. Recargar configuración
             self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Nueva Escuela"
             self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
+            self.admin_telefono = self.db.obtener_configuracion("admin_telefono") or ""
+            self.dia_cobranza = int(self.db.obtener_configuracion("dia_cobranza") or "5")
             
             # 3. Actualizar UI (Título y Configuración)
             self.view.title(f"Sistema de Gestión Escolar - {self.nombre_escuela}")
-            self.view.actualizar_ui_configuracion(self.nombre_escuela, self.mostrar_grafico)
+            self.view.actualizar_ui_configuracion(self.nombre_escuela, self.mostrar_grafico, self.admin_telefono, self.dia_cobranza)
 
             # 4. Refrescar datos de las tablas y dashboard
             self.actualizar_apoderados()
@@ -165,43 +186,22 @@ class SchoolController:
         self.view.actualizar_tabla_pagos(pagos)
 
     def guardar_apoderado(self, nombre: str, tel: str, email: str):
-        nombre = nombre.strip() if nombre else ""
-        tel = tel.strip() if tel else ""
-        email = email.strip() if email else ""
-
-        if not nombre:
-            messagebox.showerror("Error", "El nombre es obligatorio")
+        datos = self._validar_datos_apoderado(nombre, tel, email)
+        if not datos:
             return
         
-        if tel and not re.match(r"^\+?[\d\s-]+$", tel):
-            messagebox.showerror("Error", "El teléfono contiene caracteres inválidos")
-            return
-
-        # Validación de formato de email
-        if not self._validar_email(email):
-            messagebox.showerror("Error", "El formato del email es inválido (ej: correo@dominio.com)")
-            return
-        
+        nombre, tel, email = datos
         self.db.agregar_apoderado(nombre, tel, email)
         self.view.mostrar_mensaje_estado("Apoderado guardado correctamente")
         self.view.limpiar_form_apoderado()
         self.actualizar_apoderados() # Actualizar lista en pestaña inscripción
 
     def editar_apoderado(self, id: int, nombre: str, tel: str, email: str, window: Any):
-        nombre = nombre.strip() if nombre else ""
-        tel = tel.strip() if tel else ""
-        email = email.strip() if email else ""
-
-        if not nombre:
-            messagebox.showerror("Error", "El nombre es obligatorio")
-            return
-        if tel and not re.match(r"^\+?[\d\s-]+$", tel):
-            messagebox.showerror("Error", "El teléfono contiene caracteres inválidos")
-            return
-        if not self._validar_email(email):
-            messagebox.showerror("Error", "El formato del email es inválido")
+        datos = self._validar_datos_apoderado(nombre, tel, email)
+        if not datos:
             return
             
+        nombre, tel, email = datos
         self.db.actualizar_apoderado(id, nombre, tel, email)
         self.view.mostrar_mensaje_estado("Apoderado actualizado correctamente")
         window.destroy()
@@ -390,6 +390,120 @@ class SchoolController:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def enviar_recordatorio_pago(self, id_alumno: int):
+        # 1. Obtener datos de contacto
+        datos = self.db.obtener_datos_cobranza(id_alumno)
+        if not datos:
+            messagebox.showerror("Error", "No se encontraron datos para este alumno.")
+            return
+        
+        nombre_apo, telefono, nombre_alu = datos[0]
+
+        # 2. Calcular Deuda
+        deuda = self._calcular_deuda_alumno(id_alumno)
+        
+        if not deuda:
+            messagebox.showinfo("Información", f"El alumno {nombre_alu} está al día en sus pagos.")
+            return
+
+        deuda_str = ", ".join(deuda)
+        telefono = telefono.strip() if telefono else ""
+
+        # 3. Validar y Enviar
+        if not telefono.startswith("+"):
+            messagebox.showwarning("Formato Incorrecto", "El teléfono debe incluir código de país (Ej: +52...) para usar WhatsApp.")
+            return
+
+        mensaje = (f"Estimado/a {nombre_apo}, le recordamos que el alumno {nombre_alu} "
+                   f"tiene pendientes las mensualidades de: {deuda_str}. "
+                   f"Favor regularizar. Atte, {self.nombre_escuela}")
+
+        if messagebox.askyesno("Enviar WhatsApp", f"¿Enviar recordatorio a {telefono}?\n\nMensaje: {mensaje}"):
+            self._ejecutar_envio_whatsapp(telefono, mensaje)
+
+    def enviar_anuncio_general(self):
+        """Envía un mensaje a todos los apoderados registrados."""
+        apoderados = self.db.obtener_telefonos_apoderados()
+        if not apoderados:
+            messagebox.showinfo("Info", "No hay apoderados con teléfono registrado.")
+            return
+            
+        mensaje = simpledialog.askstring("Anuncio General", "Ingrese el mensaje para TODOS los apoderados:")
+        if not mensaje: return
+
+        if not messagebox.askyesno("Confirmar envío masivo", f"Se enviará el mensaje a {len(apoderados)} contactos.\nEsto tomará tiempo y abrirá múltiples pestañas.\n¿Continuar?"):
+            return
+
+        self.view.mostrar_mensaje_estado("Iniciando envío masivo...")
+        
+        def worker():
+            enviados = 0
+            errores = 0
+            for nombre, tel in apoderados:
+                tel = tel.strip()
+                if not tel.startswith("+"):
+                    errores += 1
+                    continue
+                
+                msg_personalizado = f"Hola {nombre}. {mensaje}"
+                if WhatsAppService.enviar_mensaje(tel, msg_personalizado):
+                    enviados += 1
+                else:
+                    errores += 1
+                # Espera de seguridad entre mensajes para dar tiempo al navegador
+                time.sleep(8) 
+            
+            self.view.after(0, lambda: messagebox.showinfo("Reporte", f"Envío finalizado.\nEnviados: {enviados}\nFallidos/Sin formato: {errores}"))
+            self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Envío masivo finalizado."))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def enviar_recordatorio_morosos_masivo(self):
+        """Busca todos los alumnos con deuda y envía recordatorios a sus apoderados."""
+        estudiantes = self.db.obtener_estudiantes_completo()
+        morosos = []
+        
+        # Filtrar quiénes tienen deuda
+        for est in estudiantes:
+            # est: id, nombre, grado, fecha, nombre_apo, tel, email
+            id_alu, nombre_alu, _, _, nombre_apo, tel, _ = est
+            deuda = self._calcular_deuda_alumno(id_alu)
+            if deuda and tel:
+                morosos.append((nombre_apo, tel, nombre_alu, deuda))
+        
+        if not morosos:
+            messagebox.showinfo("Info", "No se encontraron alumnos con deuda y teléfono registrado.")
+            return
+
+        if not messagebox.askyesno("Confirmar Cobranza Masiva", f"Se encontraron {len(morosos)} alumnos morosos con teléfono.\n¿Desea enviar los recordatorios por WhatsApp?"):
+            return
+
+        self.view.mostrar_mensaje_estado("Iniciando cobranza masiva...")
+        
+        def worker():
+            enviados = 0
+            errores = 0
+            for nombre_apo, tel, nombre_alu, deuda in morosos:
+                tel = tel.strip()
+                if not tel.startswith("+"):
+                    errores += 1
+                    continue
+                
+                deuda_str = ", ".join(deuda)
+                mensaje = (f"Estimado/a {nombre_apo}, le recordamos que el alumno {nombre_alu} "
+                           f"tiene pendientes: {deuda_str}. Favor regularizar. Atte, {self.nombre_escuela}")
+                
+                if WhatsAppService.enviar_mensaje(tel, mensaje):
+                    enviados += 1
+                else:
+                    errores += 1
+                time.sleep(8)
+            
+            self.view.after(0, lambda: messagebox.showinfo("Reporte Cobranza", f"Proceso finalizado.\nEnviados: {enviados}\nFallidos: {errores}"))
+            self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Cobranza masiva finalizada."))
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _worker_recibo(self, file_path, datos_pago):
         try:
             ReportService.generar_recibo_pago_pdf(file_path, datos_pago, self.nombre_escuela)
@@ -483,7 +597,62 @@ class SchoolController:
         except Exception as e:
             print(f"Error creando backup automático: {e}")
 
+    def _ejecutar_envio_whatsapp(self, telefono, mensaje):
+        if not WhatsAppService.hay_internet():
+            messagebox.showerror("Error", "No se detecta conexión a internet.")
+            return
+
+        self.view.mostrar_mensaje_estado("Abriendo WhatsApp Web, por favor espere...")
+        
+        def worker():
+            exito = WhatsAppService.enviar_mensaje(telefono, mensaje)
+            if exito:
+                self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Mensaje enviado (verifique su navegador)."))
+            else:
+                self.view.after(0, lambda: messagebox.showerror("Error", "Fallo al enviar mensaje."))
+
+        threading.Thread(target=worker, daemon=True).start()
+
     # --- Métodos Auxiliares ---
+
+    def _validar_datos_apoderado(self, nombre: str, tel: str, email: str) -> Optional[tuple]:
+        nombre = nombre.strip() if nombre else ""
+        tel = tel.strip() if tel else ""
+        email = email.strip() if email else ""
+
+        if not nombre:
+            messagebox.showerror("Error", "El nombre es obligatorio")
+            return None
+        
+        if tel:
+            if not re.match(r"^\+[\d\s-]+$", tel):
+                messagebox.showwarning("Aviso", "Se recomienda usar el formato internacional (+52...) para las funciones de WhatsApp.")
+            elif not re.match(r"^\+?[\d\s-]+$", tel):
+                messagebox.showerror("Error", "El teléfono contiene caracteres inválidos")
+                return None
+
+        if not self._validar_email(email):
+            messagebox.showerror("Error", "El formato del email es inválido (ej: correo@dominio.com)")
+            return None
+            
+        return nombre, tel, email
+
+    def _calcular_deuda_alumno(self, id_alumno: int) -> List[str]:
+        now = datetime.now()
+        mes_actual_idx = now.month - 1
+        
+        # Si el día actual es menor al día de cobranza, el mes actual no se considera deuda
+        if now.day < self.dia_cobranza:
+            mes_actual_idx -= 1
+            
+        if mes_actual_idx < self.INICIO_CLASES_IDX:
+             return []
+
+        meses_requeridos = self.MESES[self.INICIO_CLASES_IDX : mes_actual_idx + 1]
+        pagos = self.db.obtener_pagos_alumno(id_alumno)
+        meses_pagados = {p[0] for p in pagos}
+        
+        return [m for m in meses_requeridos if m not in meses_pagados]
 
     def _validar_email(self, email: str) -> bool:
         # Regex mejorado para validación de email

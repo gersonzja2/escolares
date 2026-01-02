@@ -72,8 +72,6 @@ class SchoolDB:
         conn.commit()
         
         # Migraciones: Agregar columnas a tablas existentes si no existen
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
         try:
             cursor.execute("ALTER TABLE apoderados ADD COLUMN fecha_registro TEXT")
         except sqlite3.OperationalError: pass
@@ -253,6 +251,20 @@ class SchoolDB:
         '''
         return self.obtener_datos(query, (id_estudiante,))
 
+    def obtener_datos_cobranza(self, id_alumno):
+        """Obtiene datos básicos para contacto: Nombre Apoderado, Teléfono, Nombre Alumno."""
+        query = '''
+            SELECT a.nombre, a.telefono, e.nombre
+            FROM estudiantes e
+            JOIN apoderados a ON e.apoderado_id = a.id
+            WHERE e.id = ?
+        '''
+        return self.obtener_datos(query, (id_alumno,))
+
+    def obtener_telefonos_apoderados(self):
+        """Retorna lista de (nombre, telefono) de todos los apoderados con teléfono registrado."""
+        return self.obtener_datos("SELECT nombre, telefono FROM apoderados WHERE telefono IS NOT NULL AND telefono != ''")
+
     def obtener_configuracion(self, clave):
         res = self.obtener_datos("SELECT valor FROM configuracion WHERE clave = ?", (clave,))
         return res[0][0] if res else None
@@ -260,18 +272,20 @@ class SchoolDB:
     def guardar_configuracion(self, clave, valor):
         self.ejecutar_query("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
 
-    def obtener_estadisticas_dashboard(self, mes_actual):
+    def obtener_estadisticas_dashboard(self, mes_nombre):
         conn = self._conectar()
         cursor = conn.cursor()
         
         cursor.execute("SELECT COUNT(*) FROM estudiantes")
         total_alumnos = cursor.fetchone()[0]
         
-        cursor.execute("SELECT SUM(monto) FROM mensualidades WHERE mes = ?", (mes_actual,))
-        ingresos = cursor.fetchone()[0]
+        cursor.execute("SELECT SUM(monto) FROM mensualidades WHERE mes = ?", (mes_nombre,))
+        res_ingresos = cursor.fetchone()[0]
+        ingresos = res_ingresos if res_ingresos else 0.0
+
         conn.close()
         
-        return total_alumnos, (ingresos if ingresos else 0.0)
+        return total_alumnos, ingresos
 
     def obtener_alumnos_por_grado(self):
         query = "SELECT grado, COUNT(*) FROM estudiantes GROUP BY grado ORDER BY grado"
