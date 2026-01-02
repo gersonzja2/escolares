@@ -253,7 +253,8 @@ class SchoolController:
             
         lista_morosos = []
         for est in estudiantes:
-            eid, nombre, grado, apo, tel = est
+            # Se ajusta el desempaquetado para los 7 valores que retorna la consulta (ignoramos fecha y email)
+            eid, nombre, grado, _, apo, tel, _ = est
             pagados = pagos_map.get(eid, set())
             
             # Calcular meses faltantes
@@ -269,7 +270,7 @@ class SchoolController:
 
     def exportar_alumnos_csv(self):
         datos = self.db.obtener_estudiantes_completo()
-        headers = ["ID", "Nombre Alumno", "Grado", "Nombre Apoderado", "Teléfono"]
+        headers = ["ID", "Nombre Alumno", "Grado", "Fecha Registro", "Nombre Apoderado", "Teléfono", "Email Apoderado"]
         self._exportar_csv(datos, headers, "Lista_Alumnos.csv", "Guardar lista de alumnos")
 
     def generar_ficha_alumno_pdf(self, id_alumno: int):
@@ -285,11 +286,12 @@ class SchoolController:
             messagebox.showerror("Error", "No se encontraron datos del alumno")
             return
             
-        nombre_alu, grado, nombre_apo, tel_apo, email_apo = datos[0]
+        nombre_alu, grado, fecha_reg, nombre_apo, tel_apo, email_apo = datos[0]
         
         # Manejo de valores nulos para evitar que salga "None" en el PDF
         tel_apo = tel_apo if tel_apo else "No registrado"
         email_apo = email_apo if email_apo else "No registrado"
+        fecha_reg = fecha_reg if fecha_reg else "No registrada"
         
         file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"Ficha_{nombre_alu}.pdf", title="Guardar Ficha de Alumno")
         if not file_path: return
@@ -305,6 +307,7 @@ class SchoolController:
                 c.setFont("Helvetica", 12)
                 c.drawString(50, height - 100, f"Nombre del Alumno: {nombre_alu}")
                 c.drawString(50, height - 120, f"Grado/Curso: {grado}")
+                c.drawString(350, height - 120, f"Fecha Registro: {fecha_reg}")
                 
                 c.line(50, height - 140, width - 50, height - 140)
                 
@@ -316,6 +319,27 @@ class SchoolController:
                 c.drawString(50, height - 220, f"Teléfono: {tel_apo}")
                 c.drawString(50, height - 240, f"Email: {email_apo}")
                 
+                # Tabla de Pagos
+                y = height - 280
+                c.setFont("Helvetica-Bold", 14)
+                c.drawString(50, y, "Historial de Pagos Recientes")
+                y -= 25
+                c.setFont("Helvetica-Bold", 10)
+                c.drawString(50, y, "Mes")
+                c.drawString(200, y, "Monto")
+                c.drawString(350, y, "Fecha Pago")
+                c.line(50, y-5, 500, y-5)
+                y -= 20
+                c.setFont("Helvetica", 10)
+                
+                pagos = self.db.obtener_pagos_alumno(id_alumno)
+                for p in pagos[:15]: # Mostrar solo los últimos 15 para que quepan
+                    mes, monto, fecha = p
+                    c.drawString(50, y, str(mes))
+                    c.drawString(200, y, f"${monto:,.0f}")
+                    c.drawString(350, y, str(fecha))
+                    y -= 15
+
                 c.setFont("Helvetica-Oblique", 10)
                 c.drawString(50, 50, f"Generado por Sistema de Gestión Escolar - {self.nombre_escuela}")
                 
@@ -328,7 +352,7 @@ class SchoolController:
 
     def exportar_pagos_csv(self):
         datos = self.db.obtener_historial_pagos()
-        headers = ["ID Pago", "Alumno", "Monto", "Mes", "Pagado (1=Sí, 0=No)", "Fecha Pago"]
+        headers = ["ID Pago", "Alumno", "Grado", "Monto", "Mes", "Pagado (1=Sí, 0=No)", "Fecha Pago"]
         self._exportar_csv(datos, headers, "Historial_Pagos.csv", "Guardar historial de pagos")
 
     def exportar_morosos_csv(self, datos: List[Any], titulo_reporte: str):

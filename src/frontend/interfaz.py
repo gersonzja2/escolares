@@ -11,7 +11,7 @@ class AppEscolar(ctk.CTk):
         self.controller = controller
 
         self.title("Sistema de Gestión Escolar")
-        self.geometry("900x600")
+        self.geometry("1200x800")
 
         # Layout principal
         self.grid_columnconfigure(0, weight=1)
@@ -45,6 +45,21 @@ class AppEscolar(ctk.CTk):
         self.lbl_estado.configure(text=mensaje, text_color=color)
         # Restaurar mensaje por defecto "Listo" después de 4 segundos (4000 ms)
         self.after(4000, lambda: self.lbl_estado.configure(text="Listo", text_color="gray"))
+
+    def ordenar_columnas(self, tree, col, reverse):
+        l = [(tree.set(k, col), k) for k in tree.get_children('')]
+        
+        # Intentar ordenar como número (manejando símbolos de moneda)
+        try:
+            l.sort(key=lambda t: float(t[0].replace("$", "").replace(",", "")), reverse=reverse)
+        except ValueError:
+            l.sort(reverse=reverse)
+
+        for index, (val, k) in enumerate(l):
+            tree.move(k, '', index)
+
+        # Alternar orden para el próximo clic
+        tree.heading(col, command=lambda: self.ordenar_columnas(tree, col, not reverse))
 
     def setup_ui_inicio(self):
         self.tab_inicio.grid_columnconfigure((0, 1), weight=1)
@@ -128,6 +143,7 @@ class AppEscolar(ctk.CTk):
         self.tree_apoderados = ttk.Treeview(frame, columns=columns, show="headings")
         for col in columns:
             self.tree_apoderados.heading(col, text=col)
+            self.tree_apoderados.heading(col, command=lambda c=col: self.ordenar_columnas(self.tree_apoderados, c, False))
             self.tree_apoderados.column(col, width=120)
         
         self.tree_apoderados.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
@@ -246,6 +262,7 @@ class AppEscolar(ctk.CTk):
         
         for col in columns:
             self.tree_alumnos.heading(col, text=col)
+            self.tree_alumnos.heading(col, command=lambda c=col: self.ordenar_columnas(self.tree_alumnos, c, False))
             self.tree_alumnos.column(col, width=100)
         
         self.tree_alumnos.grid(row=1, column=0, sticky="nsew")
@@ -334,7 +351,10 @@ class AppEscolar(ctk.CTk):
         for item in self.tree_alumnos.get_children():
             self.tree_alumnos.delete(item)
         for fila in datos:
-            self.tree_alumnos.insert("", "end", values=fila)
+            # fila viene como: (id, nombre, grado, fecha_reg, apo_nombre, apo_tel, apo_email)
+            # UI espera: (ID, Nombre, Grado, Apoderado, Contacto)
+            fila_ui = (fila[0], fila[1], fila[2], fila[4], fila[5])
+            self.tree_alumnos.insert("", "end", values=fila_ui)
 
     def solicitar_eliminacion(self):
         selected = self.tree_alumnos.selection()
@@ -406,6 +426,7 @@ class AppEscolar(ctk.CTk):
         self.tree_pagos = ttk.Treeview(panel_derecho, columns=columns, show="headings")
         for col in columns:
             self.tree_pagos.heading(col, text=col)
+            self.tree_pagos.heading(col, command=lambda c=col: self.ordenar_columnas(self.tree_pagos, c, False))
             width = 140 if col == "Fecha" else 90
             self.tree_pagos.column(col, width=width)
         self.tree_pagos.grid(row=1, column=0, sticky="nsew")
@@ -424,13 +445,16 @@ class AppEscolar(ctk.CTk):
         for item in self.tree_pagos.get_children():
             self.tree_pagos.delete(item)
         for fila in datos:
+            # fila viene como: (id, nombre, grado, monto, mes, pagado, fecha_pago)
+            # UI espera: (ID, Alumno, Monto, Mes, Estado, Fecha)
+            # Saltamos el grado (índice 2) para la vista de tabla, pero lo mantenemos en CSV
+            fila_ui = [fila[0], fila[1], fila[3], fila[4], fila[5], fila[6]]
+            
             # Convertir el booleano 1/0 a texto
-            fila_lista = list(fila)
-            fila_lista[4] = "Pagado" if fila_lista[4] else "Pendiente"
+            fila_ui[4] = "Pagado" if fila_ui[4] else "Pendiente"
             # Manejar registros antiguos sin fecha
-            if len(fila_lista) > 5 and fila_lista[5] is None:
-                fila_lista[5] = ""
-            self.tree_pagos.insert("", "end", values=fila_lista)
+            if fila_ui[5] is None: fila_ui[5] = ""
+            self.tree_pagos.insert("", "end", values=fila_ui)
 
     def solicitar_pago(self):
         alu_str = self.combo_alu_pago.get()

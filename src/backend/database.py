@@ -9,8 +9,13 @@ class SchoolDB:
         self.db_path = os.path.join(base_dir, "..", db_name)
         self.init_db()
 
-    def init_db(self):
+    def _conectar(self):
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+    def init_db(self):
+        conn = self._conectar()
         cursor = conn.cursor()
         
         # Tabla Apoderados
@@ -70,18 +75,23 @@ class SchoolDB:
         try:
             cursor.execute("ALTER TABLE mensualidades ADD COLUMN fecha_pago TEXT")
         except sqlite3.OperationalError: pass
+        
+        # Índices para mejorar rendimiento de búsquedas
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_estudiantes_nombre ON estudiantes(nombre)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_mensualidades_fecha ON mensualidades(fecha_pago)")
+        
         conn.commit()
         conn.close()
 
     def ejecutar_query(self, query, params=()):
-        conn = sqlite3.connect(self.db_path)
+        conn = self._conectar()
         cursor = conn.cursor()
         cursor.execute(query, params)
         conn.commit()
         conn.close()
 
     def obtener_datos(self, query, params=()):
-        conn = sqlite3.connect(self.db_path)
+        conn = self._conectar()
         cursor = conn.cursor()
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -116,7 +126,7 @@ class SchoolDB:
         self.ejecutar_query("INSERT INTO estudiantes (nombre, grado, apoderado_id, fecha_registro) VALUES (?, ?, ?, ?)", (nombre, grado, apoderado_id, fecha))
 
     def eliminar_estudiante(self, estudiante_id):
-        conn = sqlite3.connect(self.db_path)
+        conn = self._conectar()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM mensualidades WHERE estudiante_id = ?", (estudiante_id,))
         cursor.execute("DELETE FROM estudiantes WHERE id = ?", (estudiante_id,))
@@ -131,18 +141,20 @@ class SchoolDB:
 
     def obtener_estudiantes_completo(self):
         query = '''
-            SELECT e.id, e.nombre, e.grado, a.nombre, a.telefono 
+            SELECT e.id, e.nombre, e.grado, e.fecha_registro, a.nombre, a.telefono, a.email 
             FROM estudiantes e 
             LEFT JOIN apoderados a ON e.apoderado_id = a.id
+            ORDER BY e.grado, e.nombre
         '''
         return self.obtener_datos(query)
 
     def buscar_estudiantes(self, termino):
         query = '''
-            SELECT e.id, e.nombre, e.grado, a.nombre, a.telefono 
+            SELECT e.id, e.nombre, e.grado, e.fecha_registro, a.nombre, a.telefono, a.email 
             FROM estudiantes e 
             LEFT JOIN apoderados a ON e.apoderado_id = a.id
             WHERE e.nombre LIKE ?
+            ORDER BY e.nombre
         '''
         return self.obtener_datos(query, ('%' + termino + '%',))
 
@@ -161,20 +173,29 @@ class SchoolDB:
 
     def obtener_historial_pagos(self):
         query = '''
-            SELECT m.id, e.nombre, m.monto, m.mes, m.pagado, m.fecha_pago 
+            SELECT m.id, e.nombre, e.grado, m.monto, m.mes, m.pagado, m.fecha_pago 
             FROM mensualidades m
             JOIN estudiantes e ON m.estudiante_id = e.id
-            ORDER BY m.id DESC
+            ORDER BY m.fecha_pago DESC, m.id DESC
         '''
         return self.obtener_datos(query)
 
+    def obtener_pagos_alumno(self, estudiante_id):
+        query = '''
+            SELECT mes, monto, fecha_pago 
+            FROM mensualidades 
+            WHERE estudiante_id = ? 
+            ORDER BY id DESC
+        '''
+        return self.obtener_datos(query, (estudiante_id,))
+
     def buscar_pagos(self, termino):
         query = '''
-            SELECT m.id, e.nombre, m.monto, m.mes, m.pagado, m.fecha_pago 
+            SELECT m.id, e.nombre, e.grado, m.monto, m.mes, m.pagado, m.fecha_pago 
             FROM mensualidades m
             JOIN estudiantes e ON m.estudiante_id = e.id
             WHERE e.nombre LIKE ?
-            ORDER BY m.id DESC
+            ORDER BY m.fecha_pago DESC
         '''
         return self.obtener_datos(query, ('%' + termino + '%',))
 
@@ -199,7 +220,7 @@ class SchoolDB:
 
     def obtener_estudiante_detalle(self, id_estudiante):
         query = '''
-            SELECT e.nombre, e.grado, a.nombre, a.telefono, a.email
+            SELECT e.nombre, e.grado, e.fecha_registro, a.nombre, a.telefono, a.email
             FROM estudiantes e 
             LEFT JOIN apoderados a ON e.apoderado_id = a.id
             WHERE e.id = ?
@@ -214,7 +235,7 @@ class SchoolDB:
         self.ejecutar_query("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
 
     def obtener_estadisticas_dashboard(self, mes_actual):
-        conn = sqlite3.connect(self.db_path)
+        conn = self._conectar()
         cursor = conn.cursor()
         
         cursor.execute("SELECT COUNT(*) FROM estudiantes")
