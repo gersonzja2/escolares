@@ -216,6 +216,15 @@ class SchoolDB:
         '''
         return self.obtener_datos(query, ('%' + termino + '%',))
 
+    def obtener_pago_detalle(self, id_pago):
+        query = '''
+            SELECT m.id, e.nombre, e.grado, m.monto, m.mes, m.fecha_pago 
+            FROM mensualidades m
+            JOIN estudiantes e ON m.estudiante_id = e.id
+            WHERE m.id = ?
+        '''
+        return self.obtener_datos(query, (id_pago,))
+
     def verificar_pago_existente(self, estudiante_id, mes):
         query = "SELECT COUNT(*) FROM mensualidades WHERE estudiante_id = ? AND mes = ?"
         result = self.obtener_datos(query, (estudiante_id, mes))

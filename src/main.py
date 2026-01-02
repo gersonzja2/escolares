@@ -348,6 +348,20 @@ class SchoolController:
         titulo = f"Morosidad Acumulada (Marzo - {mes_corte})"
         self.view.mostrar_ventana_morosos(lista_morosos, titulo)
 
+    def generar_recibo_pago(self, id_pago: int):
+        datos = self.db.obtener_pago_detalle(id_pago)
+        if not datos:
+            messagebox.showerror("Error", "No se encontraron detalles del pago")
+            return
+        
+        datos_pago = datos[0]
+        file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"Recibo_{id_pago}.pdf", title="Guardar Recibo")
+        if not file_path: return
+
+        self.view.configure(cursor="watch")
+        # Reutilizamos el worker thread para no congelar la UI
+        threading.Thread(target=lambda: self._worker_recibo(file_path, datos_pago), daemon=True).start()
+
     def exportar_alumnos_csv(self):
         datos = self.db.obtener_estudiantes_completo()
         headers = ["ID", "Nombre Alumno", "Grado", "Fecha Registro", "Nombre Apoderado", "Teléfono", "Email Apoderado"]
@@ -375,6 +389,13 @@ class SchoolController:
                 self.view.after(0, lambda: self._finalizar_tarea_visual(f"Error: {e}", es_error=True))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _worker_recibo(self, file_path, datos_pago):
+        try:
+            ReportService.generar_recibo_pago_pdf(file_path, datos_pago, self.nombre_escuela)
+            self.view.after(0, lambda: self._finalizar_tarea_visual("Recibo generado correctamente"))
+        except Exception as e:
+            self.view.after(0, lambda: self._finalizar_tarea_visual(f"Error: {e}", es_error=True))
 
     def exportar_pagos_csv(self):
         datos = self.db.obtener_historial_pagos()
@@ -469,6 +490,27 @@ class SchoolController:
         if email and not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
             return False
         return True
+
+    def leer_documentacion(self, nombre_archivo: str) -> str:
+        """Lee un archivo de texto/markdown buscando en la ruta correcta (exe o script)."""
+        path = None
+        if getattr(sys, 'frozen', False):
+            # Si es ejecutable (PyInstaller), buscar en carpeta temporal _MEIPASS o junto al exe
+            if hasattr(sys, '_MEIPASS'):
+                path = os.path.join(sys._MEIPASS, nombre_archivo)
+            else:
+                path = os.path.join(os.path.dirname(sys.executable), nombre_archivo)
+        else:
+            # Si es script, buscar en la raíz del proyecto (subir desde src/)
+            path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), nombre_archivo)
+            
+        if path and os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                return f"Error al leer el archivo: {e}"
+        return "Archivo de documentación no encontrado.\nAsegúrese de que el archivo .md esté en la carpeta del programa."
 
     def _exportar_csv(self, datos: List[Any], headers: List[str], default_name: str, title: str):
         file_path = filedialog.asksaveasfilename(

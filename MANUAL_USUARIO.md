@@ -10,11 +10,16 @@ Bienvenido al Sistema de Gestión Escolar. Este software permite administrar de 
 *   Las librerías necesarias (ver `requirements.txt`).
 
 ### Pasos para iniciar
+**Opción A: Desde código fuente**
 1.  Abra una terminal en la carpeta del proyecto.
 2.  Ejecute el comando:
     ```bash
     python src/main.py
     ```
+
+**Opción B: Versión Ejecutable (.exe)**
+1.  Ubique la carpeta `SistemaEscolar` (generalmente dentro de `dist` si lo acaba de compilar).
+2.  Haga doble clic en el archivo `SistemaEscolar.exe`.
 
 ## 3. Navegación Principal
 La aplicación se divide en 5 pestañas principales ubicadas en la parte superior:
@@ -87,3 +92,13 @@ Aquí encontrará un resumen visual del estado del colegio.
     *   El sistema le preguntará dónde guardarlos cada vez que genere uno.
 *   **¿Cómo recupero una copia de seguridad?**
     *   Use la opción "Abrir Otra Escuela" en Configuración y seleccione su archivo de respaldo (puede buscar en la carpeta `backups` generada automáticamente).
+
+## 6. Mover el programa a otro PC (Portabilidad)
+
+El sistema es completamente portable. Para llevarlo a otro equipo junto con todos sus datos:
+
+1.  **Copie la carpeta completa** `SistemaEscolar` (la que contiene el archivo `.exe`) a una memoria USB o disco externo.
+2.  Pegue la carpeta en el nuevo computador.
+3.  ¡Listo! Al abrir `SistemaEscolar.exe`, todos sus alumnos, pagos y configuraciones estarán ahí.
+
+*Nota: La base de datos es el archivo `escolares.db` que se encuentra dentro de esa carpeta. Si usted creó bases de datos adicionales en otras ubicaciones (ej: Mis Documentos), deberá copiar esos archivos `.db` manualmente y abrirlos usando la opción "Abrir Otra Escuela".*

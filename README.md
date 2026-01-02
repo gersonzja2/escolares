@@ -44,7 +44,8 @@ Aplicación de escritorio desarrollada en Python para la administración eficien
 
 ## Uso
 
-Para iniciar la aplicación, ejecute el archivo principal desde la carpeta raíz del proyecto:
+**Opción A: Ejecutar desde código fuente (Python)**
+Ejecute el archivo principal desde la carpeta raíz:
 
 ```bash
 python src/main.py
@@ -58,3 +59,16 @@ python src/main.py
 *   `src/main.py`: Controlador principal y punto de entrada.
 *   `src/frontend/`: Interfaz gráfica (UI) construida con CustomTkinter.
 *   `src/backend/`: Lógica de base de datos (SQLite) y servicios de generación de archivos.
+
+## Generar Ejecutable Portable (.exe)
+
+Para crear una versión que funcione en cualquier computador con Windows (sin necesidad de instalar Python):
+
+1.  Ejecute el script de construcción:
+    ```bash
+    python build.py
+    ```
+2.  Se generará una carpeta `dist/SistemaEscolar`.
+3.  **Esa carpeta es su aplicación portable.** Puede copiarla completa a una memoria USB o a otro computador.
+4.  Para usar el programa, abra el archivo `SistemaEscolar.exe` que está dentro de esa carpeta.
+    *   *Importante: La carpeta contiene su base de datos (`escolares.db`). Si la mueve a otro PC, sus datos viajarán con ella.*

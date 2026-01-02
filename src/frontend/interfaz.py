@@ -188,6 +188,13 @@ class AppEscolar(ctk.CTk):
         ctk.CTkButton(frame_escuelas, text="📂 Abrir Otra Escuela", command=self.controller.cargar_escuela).pack(side="left", padx=5)
         ctk.CTkButton(frame_escuelas, text="➕ Crear Nueva Escuela", fg_color="green", command=self.controller.nueva_escuela).pack(side="left", padx=5)
 
+        # Ayuda y Documentación
+        ctk.CTkLabel(frame, text="Ayuda y Documentación", font=("Arial", 16, "bold")).pack(pady=(20, 10))
+        frame_ayuda = ctk.CTkFrame(frame, fg_color="transparent")
+        frame_ayuda.pack()
+        ctk.CTkButton(frame_ayuda, text="📖 Manual de Usuario", command=lambda: self.abrir_visor_documentacion("Manual de Usuario", "MANUAL_USUARIO.md")).pack(side="left", padx=5)
+        ctk.CTkButton(frame_ayuda, text="ℹ️ Acerca de (Léeme)", command=lambda: self.abrir_visor_documentacion("Acerca de", "README.md")).pack(side="left", padx=5)
+
         ctk.CTkLabel(frame, text="Mantenimiento", font=("Arial", 16, "bold")).pack(pady=(40, 10))
         ctk.CTkButton(frame, text="Crear Respaldo de Base de Datos (Backup)", fg_color="#E0A800", text_color="black", command=self.controller.realizar_backup).pack(pady=10)
 
@@ -200,6 +207,19 @@ class AppEscolar(ctk.CTk):
         ctk.CTkButton(frame_danger, text="Borrar Todos los Pagos", fg_color="#D35B58", hover_color="#C72C41", width=180, command=self.controller.eliminar_todos_pagos).pack(side="left", padx=5)
         ctk.CTkButton(frame_danger, text="Borrar Todos los Alumnos", fg_color="#D35B58", hover_color="#C72C41", width=180, command=self.controller.eliminar_todos_alumnos).pack(side="left", padx=5)
         ctk.CTkButton(frame_danger, text="Borrar Todos los Apoderados", fg_color="#D35B58", hover_color="#C72C41", width=180, command=self.controller.eliminar_todos_apoderados).pack(side="left", padx=5)
+
+    def abrir_visor_documentacion(self, titulo, nombre_archivo):
+        contenido = self.controller.leer_documentacion(nombre_archivo)
+        
+        top = ctk.CTkToplevel(self)
+        top.title(titulo)
+        top.geometry("800x600")
+        
+        # Area de texto con scroll
+        textbox = ctk.CTkTextbox(top, font=("Consolas", 12))
+        textbox.pack(fill="both", expand=True, padx=10, pady=10)
+        textbox.insert("0.0", contenido)
+        textbox.configure(state="disabled") # Solo lectura
 
     def cambiar_tema(self, new_mode):
         ctk.set_appearance_mode(new_mode)
@@ -490,6 +510,7 @@ class AppEscolar(ctk.CTk):
         # Sección de Administración
         ctk.CTkLabel(panel_pago, text="--- Administración ---", text_color="gray").pack(pady=(10, 5))
         ctk.CTkButton(panel_pago, text="Modificar Seleccionado", fg_color="#E0A800", text_color="black", command=self.solicitar_modificar_pago).pack(pady=5)
+        ctk.CTkButton(panel_pago, text="📄 Imprimir Recibo", fg_color="#3B8ED0", command=self.solicitar_recibo).pack(pady=5)
         ctk.CTkButton(panel_pago, text="Eliminar Seleccionado", fg_color="red", command=self.solicitar_eliminar_pago).pack(pady=5)
 
         # Sección de Reportes
@@ -563,6 +584,15 @@ class AppEscolar(ctk.CTk):
 
     def solicitar_exportar_pagos(self):
         self.controller.exportar_pagos_csv()
+
+    def solicitar_recibo(self):
+        selected = self.tree_pagos.selection()
+        if selected:
+            item = self.tree_pagos.item(selected[0])
+            id_pago = item['values'][0]
+            self.controller.generar_recibo_pago(id_pago)
+        else:
+            messagebox.showwarning("Aviso", "Seleccione un pago del historial para generar el recibo.")
 
     def solicitar_busqueda_pagos(self):
         termino = self.entry_busqueda_pagos.get()

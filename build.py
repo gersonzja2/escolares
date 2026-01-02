@@ -15,6 +15,9 @@ PyInstaller.__main__.run([
     '--noconfirm',                      # Sobrescribir carpeta dist sin preguntar
     '--clean',                          # Limpiar caché de compilación
     
+    # Si tienes un icono, descomenta la siguiente línea y pon el nombre de tu archivo .ico
+    # '--icon=src/icono.ico',
+    
     # Recolectar recursos de librerías complejas
     '--collect-all=customtkinter',
     '--collect-all=reportlab',

@@ -83,3 +83,40 @@ class ReportService:
         c.drawString(50, 50, f"Generado por Sistema de Gestión Escolar - {nombre_escuela}")
         
         c.save()
+
+    @staticmethod
+    def generar_recibo_pago_pdf(file_path: str, datos_pago: tuple, nombre_escuela: str):
+        """Genera un recibo de pago individual."""
+        if not HAS_REPORTLAB: return
+
+        # datos_pago: (id, nombre_alu, grado, monto, mes, fecha)
+        id_pago, nombre_alu, grado, monto, mes, fecha = datos_pago
+        
+        # Usamos media carta o similar para recibos, pero letter está bien por simplicidad
+        c = canvas.Canvas(file_path, pagesize=letter)
+        
+        # Diseño tipo "Voucher"
+        c.setLineWidth(2)
+        c.rect(50, 500, 500, 250) # Marco
+        
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(300, 720, f"RECIBO DE PAGO - {nombre_escuela.upper()}")
+        
+        c.setFont("Helvetica", 12)
+        c.drawString(70, 680, f"N° de Transacción: #{id_pago:06d}")
+        c.drawString(350, 680, f"Fecha: {fecha}")
+        
+        c.line(70, 670, 530, 670)
+        
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(70, 630, f"Recibimos de: {nombre_alu}")
+        c.setFont("Helvetica", 12)
+        c.drawString(70, 610, f"Grado/Curso: {grado}")
+        
+        c.drawString(70, 570, f"La suma de: ${monto:,.0f}")
+        c.drawString(70, 550, f"Por concepto de: Mensualidad {mes}")
+        
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawCentredString(300, 520, "Gracias por su pago.")
+        
+        c.save()
