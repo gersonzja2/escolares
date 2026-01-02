@@ -235,17 +235,6 @@ class SchoolDB:
         result = self.obtener_datos(query, (estudiante_id, mes))
         return result[0][0] > 0
 
-    def obtener_morosos(self, mes):
-        query = '''
-            SELECT e.id, e.nombre, e.grado, a.nombre, a.telefono 
-            FROM estudiantes e 
-            LEFT JOIN apoderados a ON e.apoderado_id = a.id
-            WHERE e.id NOT IN (
-                SELECT estudiante_id FROM mensualidades WHERE mes = ?
-            )
-        '''
-        return self.obtener_datos(query, (mes,))
-
     def obtener_pagos_todos(self):
         return self.obtener_datos("SELECT estudiante_id, mes FROM mensualidades")
 

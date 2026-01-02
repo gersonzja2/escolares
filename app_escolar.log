@@ -14,3 +14,15 @@
 2026-01-02 19:56:44,035 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
 2026-01-02 19:56:44,036 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
 2026-01-02 19:56:44,038 - INFO - Backup antiguo eliminado: backups\agricola_auto_20260102_174718.db
+2026-01-02 20:16:33,301 - INFO - Migración: Columna fecha_registro ya existe en apoderados
+2026-01-02 20:16:33,301 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
+2026-01-02 20:16:33,302 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
+2026-01-02 20:16:33,304 - INFO - Backup antiguo eliminado: backups\agricola_auto_20260102_175110.db
+2026-01-02 20:28:20,358 - INFO - Migración: Columna fecha_registro ya existe en apoderados
+2026-01-02 20:28:20,359 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
+2026-01-02 20:28:20,359 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
+2026-01-02 20:28:20,361 - INFO - Backup antiguo eliminado: backups\agricola_auto_20260102_180306.db
+2026-01-02 20:29:15,221 - INFO - Migración: Columna fecha_registro ya existe en apoderados
+2026-01-02 20:29:15,222 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
+2026-01-02 20:29:15,222 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
+2026-01-02 20:29:15,224 - INFO - Backup antiguo eliminado: backups\agricola_auto_20260102_181538.db

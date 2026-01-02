@@ -444,8 +444,8 @@ class SchoolController:
             return
 
         mensaje = (f"Estimado/a {nombre_apo}, le recordamos que el alumno {nombre_alu} "
-                   f"tiene pendientes las mensualidades de: {deuda_str}. "
-                   f"Favor regularizar. Atte, {self.nombre_escuela}")
+                    f"tiene pendientes las mensualidades de: {deuda_str}. "
+                    f"Favor regularizar. Atte, {self.nombre_escuela}")
 
         if messagebox.askyesno("Enviar WhatsApp", f"¿Enviar recordatorio a {telefono}?\n\nMensaje: {mensaje}"):
             self._ejecutar_envio_whatsapp(telefono, mensaje)
@@ -662,7 +662,7 @@ class SchoolController:
             mes_actual_idx -= 1
             
         if mes_actual_idx < self.inicio_clases_idx:
-             return []
+            return []
 
         meses_requeridos = self.meses[self.inicio_clases_idx : mes_actual_idx + 1]
         pagos = self.db.obtener_pagos_alumno(id_alumno)
