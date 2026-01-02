@@ -61,8 +61,8 @@ class SchoolController:
 
     def editar_apoderado(self, id, nombre, tel, email, window):
         if not nombre:
-             messagebox.showerror("Error", "El nombre es obligatorio")
-             return
+            messagebox.showerror("Error", "El nombre es obligatorio")
+            return
         if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             messagebox.showerror("Error", "El formato del email es inválido")
             return
@@ -103,8 +103,8 @@ class SchoolController:
 
     def editar_alumno(self, id, nombre, grado, apo_id, window):
         if not nombre or not apo_id:
-             messagebox.showerror("Error", "Faltan datos o apoderado inválido")
-             return
+            messagebox.showerror("Error", "Faltan datos o apoderado inválido")
+            return
         self.db.actualizar_estudiante(id, nombre, grado, apo_id)
         messagebox.showinfo("Éxito", "Alumno actualizado correctamente")
         window.destroy()
@@ -145,7 +145,7 @@ class SchoolController:
         
         datos = self.db.obtener_estudiantes_completo()
         try:
-            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
                 writer = csv.writer(file)
                 writer.writerow(["ID", "Nombre Alumno", "Grado", "Nombre Apoderado", "Teléfono"])
                 writer.writerows(datos)
@@ -167,6 +167,10 @@ class SchoolController:
             return
             
         nombre_alu, grado, nombre_apo, tel_apo, email_apo = datos[0]
+        
+        # Manejo de valores nulos para evitar que salga "None" en el PDF
+        tel_apo = tel_apo if tel_apo else "No registrado"
+        email_apo = email_apo if email_apo else "No registrado"
         
         file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"Ficha_{nombre_alu}.pdf", title="Guardar Ficha de Alumno")
         if not file_path: return
@@ -206,7 +210,7 @@ class SchoolController:
         
         datos = self.db.obtener_historial_pagos()
         try:
-            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
                 writer = csv.writer(file)
                 writer.writerow(["ID Pago", "Alumno", "Monto", "Mes", "Pagado (1=Sí, 0=No)"])
                 writer.writerows(datos)
@@ -219,7 +223,7 @@ class SchoolController:
         if not file_path: return
         
         try:
-            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
                 writer = csv.writer(file)
                 writer.writerow(["ID Alumno", "Nombre", "Grado", "Apoderado", "Teléfono"])
                 writer.writerows(datos)
