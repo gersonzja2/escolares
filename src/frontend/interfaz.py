@@ -2,6 +2,14 @@ import customtkinter as ctk
 from tkinter import ttk, messagebox
 from datetime import datetime
 
+# Intentar importar matplotlib para gráficos
+try:
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
+
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
@@ -89,12 +97,63 @@ class AppEscolar(ctk.CTk):
         ctk.CTkLabel(frame_acciones, text="Accesos Rápidos:", font=("Arial", 14, "bold")).pack(side="left", padx=10)
         ctk.CTkButton(frame_acciones, text="+ Nuevo Alumno", command=lambda: self.tab_view.set("Inscripción y Alumnos")).pack(side="left", padx=10)
         ctk.CTkButton(frame_acciones, text="+ Registrar Pago", command=lambda: self.tab_view.set("Mensualidades")).pack(side="left", padx=10)
-        ctk.CTkButton(frame_acciones, text="↻ Actualizar Datos", fg_color="gray", command=lambda: self.controller.actualizar_dashboard()).pack(side="left", padx=10)
+        
+        ctk.CTkLabel(frame_acciones, text="|", text_color="gray").pack(side="left", padx=10)
+        
+        ctk.CTkLabel(frame_acciones, text="Mes:").pack(side="left", padx=5)
+        self.combo_mes_dashboard = ctk.CTkComboBox(frame_acciones, values=self.controller.MESES, width=110, command=self.solicitar_actualizar_dashboard)
+        self.combo_mes_dashboard.set(self.controller.MESES[datetime.now().month - 1])
+        self.combo_mes_dashboard.pack(side="left", padx=5)
+
+        ctk.CTkButton(frame_acciones, text="↻", width=40, fg_color="gray", command=self.solicitar_actualizar_dashboard).pack(side="left", padx=5)
+
+        # Gráfico de Alumnos por Grado
+        self.frame_grafico = ctk.CTkFrame(self.tab_inicio, fg_color="transparent")
+        self.frame_grafico.grid(row=3, column=0, columnspan=2, pady=20, sticky="nsew")
+        self.tab_inicio.grid_rowconfigure(3, weight=1)
+        
+        self.actualizar_grafico_alumnos()
+
+    def actualizar_grafico_alumnos(self):
+        # Limpiar gráfico anterior si existe
+        for widget in self.frame_grafico.winfo_children():
+            widget.destroy()
+
+        if not self.controller.mostrar_grafico:
+            self.frame_grafico.grid_remove()
+            return
+        
+        self.frame_grafico.grid()
+        if not HAS_MATPLOTLIB:
+            ctk.CTkLabel(self.frame_grafico, text="Instale 'matplotlib' para ver gráficos estadísticos\n(pip install matplotlib)", text_color="gray").pack(expand=True)
+            return
+
+        datos = self.controller.obtener_estadisticas_grado()
+        if not datos:
+            ctk.CTkLabel(self.frame_grafico, text="No hay datos suficientes para generar el gráfico.", text_color="gray").pack(expand=True)
+            return
+
+        grados = [d[0] for d in datos]
+        cantidades = [d[1] for d in datos]
+
+        fig = Figure(figsize=(6, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        ax.bar(grados, cantidades, color="#3B8ED0")
+        ax.set_title("Distribución de Alumnos por Grado")
+        ax.set_ylabel("Cantidad de Alumnos")
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
 
     def actualizar_tarjetas_dashboard(self, total_alumnos, ingresos, mes):
         self.lbl_total_alumnos.configure(text=str(total_alumnos))
         self.lbl_total_ingresos.configure(text=f"${ingresos:,.2f}")
         self.lbl_titulo_ingresos.configure(text=f"Ingresos de {mes}")
+
+    def solicitar_actualizar_dashboard(self, event=None):
+        mes = self.combo_mes_dashboard.get()
+        self.controller.actualizar_dashboard(mes)
 
     def setup_ui_configuracion(self):
         frame = self.tab_config
@@ -108,10 +167,25 @@ class AppEscolar(ctk.CTk):
         if hasattr(self.controller, 'nombre_escuela'):
             self.entry_nombre_escuela.insert(0, self.controller.nombre_escuela)
             
+        self.switch_grafico = ctk.CTkSwitch(frame, text="Mostrar Gráfico en Dashboard")
+        self.switch_grafico.pack(pady=5)
+        if getattr(self.controller, 'mostrar_grafico', True):
+            self.switch_grafico.select()
+        else:
+            self.switch_grafico.deselect()
+
+        ctk.CTkLabel(frame, text="Tema de la Aplicación:").pack(pady=(20, 5))
+        self.combo_tema = ctk.CTkOptionMenu(frame, values=["System", "Light", "Dark"], command=self.cambiar_tema)
+        self.combo_tema.set("System")
+        self.combo_tema.pack(pady=5)
+
         ctk.CTkButton(frame, text="Guardar Configuración", command=self.solicitar_guardar_config).pack(pady=20)
         
         ctk.CTkLabel(frame, text="Mantenimiento", font=("Arial", 16, "bold")).pack(pady=(40, 10))
         ctk.CTkButton(frame, text="Crear Respaldo de Base de Datos (Backup)", fg_color="#E0A800", text_color="black", command=self.controller.realizar_backup).pack(pady=10)
+
+    def cambiar_tema(self, new_mode):
+        ctk.set_appearance_mode(new_mode)
 
     def setup_ui_apoderados(self):
         frame = self.tab_apoderados
@@ -208,9 +282,6 @@ class AppEscolar(ctk.CTk):
         self.entry_apo_email.delete(0, 'end')
 
     def setup_ui_inscripcion(self):
-        # Asegurar que el controlador tenga el nombre cargado antes de mostrar
-        if hasattr(self.controller, 'nombre_escuela') and not self.entry_nombre_escuela.get():
-             self.entry_nombre_escuela.insert(0, self.controller.nombre_escuela)
         frame = self.tab_inscripcion
         frame.grid_columnconfigure(1, weight=1)
         frame.grid_rowconfigure(0, weight=1)
@@ -276,8 +347,8 @@ class AppEscolar(ctk.CTk):
         self.controller.preparar_edicion_alumno(id_alumno)
 
     def abrir_ventana_edicion_alumno(self, datos_alumno):
-        # datos_alumno viene de la DB: (id, nombre, grado, apoderado_id)
-        id_alu, nombre, grado, apo_id = datos_alumno
+        # datos_alumno viene de la DB: (id, nombre, grado, apoderado_id, fecha_registro)
+        id_alu, nombre, grado, apo_id, *_ = datos_alumno
         
         top = ctk.CTkToplevel(self)
         top.title("Editar Alumno")
@@ -364,7 +435,7 @@ class AppEscolar(ctk.CTk):
             self.controller.eliminar_alumno(id_alumno)
 
     def solicitar_guardar_config(self):
-        self.controller.guardar_ajustes(self.entry_nombre_escuela.get())
+        self.controller.guardar_ajustes(self.entry_nombre_escuela.get(), self.switch_grafico.get())
 
     def setup_ui_pagos(self):
         frame = self.tab_pagos

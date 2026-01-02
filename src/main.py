@@ -13,11 +13,12 @@ class SchoolController:
 
     def __init__(self):
         self.db = SchoolDB()
-        # Pasamos 'self' (el controlador) a la vista
-        self.view = AppEscolar(controller=self)
-        
         # Cargar configuración
         self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Escuela Modelo"
+        self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
+        
+        # Pasamos 'self' (el controlador) a la vista
+        self.view = AppEscolar(controller=self)
         
         # Cargar datos iniciales
         self.actualizar_apoderados()
@@ -27,18 +28,30 @@ class SchoolController:
         
         self.view.mainloop()
 
-    def actualizar_dashboard(self):
-        mes_actual = self.MESES[datetime.now().month - 1]
+    def actualizar_dashboard(self, mes_seleccionado: Optional[str] = None):
+        if mes_seleccionado:
+            mes_actual = mes_seleccionado
+        else:
+            mes_actual = self.MESES[datetime.now().month - 1]
         total_alumnos, ingresos = self.db.obtener_estadisticas_dashboard(mes_actual)
         self.view.actualizar_tarjetas_dashboard(total_alumnos, ingresos, mes_actual)
+        # Actualizar gráfico si existe
+        if hasattr(self.view, 'actualizar_grafico_alumnos'):
+            self.view.actualizar_grafico_alumnos()
 
-    def guardar_ajustes(self, nombre_escuela):
+    def guardar_ajustes(self, nombre_escuela, mostrar_grafico):
         if not nombre_escuela:
             messagebox.showerror("Error", "El nombre de la escuela no puede estar vacío")
             return
         self.db.guardar_configuracion("nombre_escuela", nombre_escuela)
+        self.db.guardar_configuracion("mostrar_grafico", "1" if mostrar_grafico else "0")
         self.nombre_escuela = nombre_escuela
+        self.mostrar_grafico = mostrar_grafico
         self.view.mostrar_mensaje_estado("Configuración guardada correctamente")
+        self.actualizar_dashboard()
+
+    def obtener_estadisticas_grado(self):
+        return self.db.obtener_alumnos_por_grado()
 
     def realizar_backup(self):
         file_path = filedialog.asksaveasfilename(

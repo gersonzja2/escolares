@@ -246,3 +246,7 @@ class SchoolDB:
         conn.close()
         
         return total_alumnos, (ingresos if ingresos else 0.0)
+
+    def obtener_alumnos_por_grado(self):
+        query = "SELECT grado, COUNT(*) FROM estudiantes GROUP BY grado ORDER BY grado"
+        return self.obtener_datos(query)
