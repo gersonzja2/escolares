@@ -85,18 +85,22 @@ class SchoolDB:
 
     def ejecutar_query(self, query, params=()):
         conn = self._conectar()
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            conn.commit()
+        finally:
+            conn.close()
 
     def obtener_datos(self, query, params=()):
         conn = self._conectar()
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        return rows
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return rows
+        finally:
+            conn.close()
 
     # --- Métodos Específicos ---
     

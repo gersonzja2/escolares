@@ -1,2 +1,3 @@
-customtkinter
-reportlab
+customtkinter>=5.0.0
+matplotlib>=3.0.0
+reportlab>=3.0.0

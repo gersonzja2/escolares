@@ -1,7 +1,7 @@
 from backend.database import SchoolDB
+from backend.services import ReportService
 from frontend.interfaz import AppEscolar
 from tkinter import messagebox, filedialog
-import csv
 import re
 from datetime import datetime
 import threading
@@ -10,6 +10,7 @@ from typing import List, Optional, Any
 
 class SchoolController:
     MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    INICIO_CLASES_IDX = 2  # Marzo es el índice 2
 
     def __init__(self):
         self.db = SchoolDB()
@@ -19,6 +20,7 @@ class SchoolController:
         
         # Pasamos 'self' (el controlador) a la vista
         self.view = AppEscolar(controller=self)
+        self.view.title(f"Sistema de Gestión Escolar - {self.nombre_escuela}")
         
         # Cargar datos iniciales
         self.actualizar_apoderados()
@@ -26,6 +28,8 @@ class SchoolController:
         self.actualizar_pagos_ui()
         self.actualizar_dashboard()
         
+    def iniciar(self):
+        """Inicia el bucle principal de la interfaz gráfica."""
         self.view.mainloop()
 
     def actualizar_dashboard(self, mes_seleccionado: Optional[str] = None):
@@ -53,6 +57,45 @@ class SchoolController:
     def obtener_estadisticas_grado(self):
         return self.db.obtener_alumnos_por_grado()
 
+    def cargar_escuela(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("SQLite DB", "*.db")],
+            title="Seleccionar Base de Datos de Escuela"
+        )
+        if file_path:
+            self.cambiar_db(file_path)
+
+    def nueva_escuela(self):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".db",
+            filetypes=[("SQLite DB", "*.db")],
+            title="Crear Nueva Base de Datos para Escuela"
+        )
+        if file_path:
+            self.cambiar_db(file_path)
+
+    def cambiar_db(self, db_path: str):
+        try:
+            # 1. Conectar a la nueva DB
+            self.db = SchoolDB(db_path)
+            
+            # 2. Recargar configuración
+            self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Nueva Escuela"
+            self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
+            
+            # 3. Actualizar UI (Título y Configuración)
+            self.view.title(f"Sistema de Gestión Escolar - {self.nombre_escuela}")
+            self.view.actualizar_ui_configuracion(self.nombre_escuela, self.mostrar_grafico)
+
+            # 4. Refrescar datos de las tablas y dashboard
+            self.actualizar_apoderados()
+            self.actualizar_alumnos()
+            self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
+            self.view.mostrar_mensaje_estado(f"Escuela cargada: {self.nombre_escuela}")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cambiar de escuela: {e}")
+
     def realizar_backup(self):
         file_path = filedialog.asksaveasfilename(
             defaultextension=".db",
@@ -62,7 +105,7 @@ class SchoolController:
         )
         if file_path:
             try:
-                shutil.copy(self.db.db.db_path, file_path)
+                shutil.copy(self.db.db_path, file_path)
                 self.view.mostrar_mensaje_estado("Copia de seguridad creada con éxito")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo crear el backup: {e}")
@@ -241,18 +284,17 @@ class SchoolController:
 
     def mostrar_reporte_morosos(self, mes_corte: str):
         # Lógica de ciclo escolar: Marzo (índice 2) a Diciembre
-        idx_inicio_clases = 2 
         try:
             mes_actual_idx = self.MESES.index(mes_corte)
         except ValueError:
             mes_actual_idx = datetime.now().month - 1
         
-        if mes_actual_idx < idx_inicio_clases:
-             messagebox.showinfo("Aviso", "El ciclo escolar comienza en Marzo. No hay reporte de morosidad disponible para Enero/Febrero.")
-             return
+        if mes_actual_idx < self.INICIO_CLASES_IDX:
+            messagebox.showinfo("Aviso", "El ciclo escolar comienza en Marzo. No hay reporte de morosidad disponible para Enero/Febrero.")
+            return
 
         # Lista de meses que DEBERÍAN estar pagados a la fecha (ej: Marzo, Abril, Mayo...)
-        meses_requeridos = self.MESES[idx_inicio_clases : mes_actual_idx + 1]
+        meses_requeridos = self.MESES[self.INICIO_CLASES_IDX : mes_actual_idx + 1]
         
         estudiantes = self.db.obtener_estudiantes_completo()
         pagos_raw = self.db.obtener_pagos_todos()
@@ -287,76 +329,21 @@ class SchoolController:
         self._exportar_csv(datos, headers, "Lista_Alumnos.csv", "Guardar lista de alumnos")
 
     def generar_ficha_alumno_pdf(self, id_alumno: int):
-        try:
-            from reportlab.pdfgen import canvas
-            from reportlab.lib.pagesizes import letter
-        except ImportError:
-            messagebox.showerror("Error", "La librería 'reportlab' no está instalada.\nPor favor ejecute: pip install reportlab")
-            return
-
         datos = self.db.obtener_estudiante_detalle(id_alumno)
         if not datos:
             messagebox.showerror("Error", "No se encontraron datos del alumno")
             return
             
-        nombre_alu, grado, fecha_reg, nombre_apo, tel_apo, email_apo = datos[0]
-        
-        # Manejo de valores nulos para evitar que salga "None" en el PDF
-        tel_apo = tel_apo if tel_apo else "No registrado"
-        email_apo = email_apo if email_apo else "No registrado"
-        fecha_reg = fecha_reg if fecha_reg else "No registrada"
+        datos_alumno = datos[0]
+        nombre_alu = datos_alumno[0]
         
         file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")], initialfile=f"Ficha_{nombre_alu}.pdf", title="Guardar Ficha de Alumno")
         if not file_path: return
 
         def worker():
             try:
-                c = canvas.Canvas(file_path, pagesize=letter)
-                width, height = letter
-                
-                c.setFont("Helvetica-Bold", 20)
-                c.drawString(50, height - 50, "Ficha del Estudiante")
-                
-                c.setFont("Helvetica", 12)
-                c.drawString(50, height - 100, f"Nombre del Alumno: {nombre_alu}")
-                c.drawString(50, height - 120, f"Grado/Curso: {grado}")
-                c.drawString(350, height - 120, f"Fecha Registro: {fecha_reg}")
-                
-                c.line(50, height - 140, width - 50, height - 140)
-                
-                c.setFont("Helvetica-Bold", 14)
-                c.drawString(50, height - 170, "Información del Apoderado")
-                
-                c.setFont("Helvetica", 12)
-                c.drawString(50, height - 200, f"Nombre: {nombre_apo}")
-                c.drawString(50, height - 220, f"Teléfono: {tel_apo}")
-                c.drawString(50, height - 240, f"Email: {email_apo}")
-                
-                # Tabla de Pagos
-                y = height - 280
-                c.setFont("Helvetica-Bold", 14)
-                c.drawString(50, y, "Historial de Pagos Recientes")
-                y -= 25
-                c.setFont("Helvetica-Bold", 10)
-                c.drawString(50, y, "Mes")
-                c.drawString(200, y, "Monto")
-                c.drawString(350, y, "Fecha Pago")
-                c.line(50, y-5, 500, y-5)
-                y -= 20
-                c.setFont("Helvetica", 10)
-                
                 pagos = self.db.obtener_pagos_alumno(id_alumno)
-                for p in pagos[:15]: # Mostrar solo los últimos 15 para que quepan
-                    mes, monto, fecha = p
-                    c.drawString(50, y, str(mes))
-                    c.drawString(200, y, f"${monto:,.0f}")
-                    c.drawString(350, y, str(fecha))
-                    y -= 15
-
-                c.setFont("Helvetica-Oblique", 10)
-                c.drawString(50, 50, f"Generado por Sistema de Gestión Escolar - {self.nombre_escuela}")
-                
-                c.save()
+                ReportService.generar_ficha_alumno_pdf(file_path, datos_alumno, pagos, self.nombre_escuela)
                 self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Ficha PDF generada correctamente"))
             except Exception as e:
                 self.view.after(0, lambda: messagebox.showerror("Error", f"No se pudo generar el PDF: {e}"))
@@ -377,7 +364,8 @@ class SchoolController:
     # --- Métodos Auxiliares ---
 
     def _validar_email(self, email: str) -> bool:
-        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        # Regex mejorado para validación de email
+        if email and not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
             return False
         return True
 
@@ -393,10 +381,7 @@ class SchoolController:
 
         def worker():
             try:
-                with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(headers)
-                    writer.writerows(datos)
+                ReportService.exportar_csv(file_path, headers, datos)
                 self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Archivo exportado correctamente"))
             except Exception as e:
                 self.view.after(0, lambda: messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}"))
@@ -405,3 +390,4 @@ class SchoolController:
 
 if __name__ == "__main__":
     controller = SchoolController()
+    controller.iniciar()

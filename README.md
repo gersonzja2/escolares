@@ -1,25 +1,58 @@
-# escolares
+# Sistema de Gestión Escolar
 
-Sistema de gestión escolar desarrollado en Python con CustomTkinter.
+Aplicación de escritorio desarrollada en Python para la administración eficiente de instituciones educativas. Permite gestionar alumnos, apoderados, mensualidades y generar reportes financieros y académicos de manera sencilla y moderna.
 
-## Características
-* **Inscripción:** Agregar, editar y eliminar alumnos. Búsqueda en tiempo real.
-* **Apoderados:** Gestión completa de contactos (CRUD).
-* **Mensualidades:** Registro de pagos, historial y detección automática de morosos.
-* **Reportes:** Exportación de datos a CSV y generación de fichas de alumnos en PDF.
+## Características Principales
 
-## Requisitos
+*   **Gestión Integral:** Registro y administración de Alumnos y Apoderados.
+*   **Control de Pagos:** Seguimiento de mensualidades, historial de pagos y detección automática de morosos.
+*   **Soporte Multi-Escuela:** Capacidad para gestionar múltiples colegios utilizando bases de datos independientes.
+*   **Dashboard Interactivo:** Visualización de estadísticas clave (total alumnos, ingresos mensuales) y gráficos de distribución.
+*   **Reportes y Exportación:**
+    *   Generación de fichas de alumno en formato **PDF**.
+    *   Exportación de listas de alumnos, historiales de pago y reportes de morosidad a **CSV** (Excel).
+*   **Seguridad:** Sistema integrado para realizar copias de seguridad (Backup) de la base de datos.
 
-Instala las dependencias necesarias ejecutando:
+## Requisitos del Sistema
 
-```bash
-pip install -r requirements.txt
-```
+*   Python 3.8 o superior.
+*   Librerías listadas en `requirements.txt`.
 
-## Ejecución
+## Instalación
 
-Ejecuta el archivo principal desde la carpeta del proyecto:
+1.  **Clonar el repositorio o descargar el código:**
+    ```bash
+    git clone <url-del-repositorio>
+    cd escolares
+    ```
+
+2.  **Crear un entorno virtual (Recomendado):**
+    ```bash
+    python -m venv venv
+    # En Windows:
+    venv\Scripts\activate
+    # En Linux/Mac:
+    source venv/bin/activate
+    ```
+
+3.  **Instalar dependencias:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Uso
+
+Para iniciar la aplicación, ejecute el archivo principal desde la carpeta raíz del proyecto:
 
 ```bash
 python src/main.py
 ```
+
+*   **Datos de Prueba:** Puede poblar el sistema con datos ficticios ejecutando `python src/datos_prueba.py`.
+*   **Configuración:** Desde la pestaña de configuración puede cambiar el nombre de la escuela, el tema visual y gestionar los archivos de base de datos.
+
+## Estructura del Proyecto
+
+*   `src/main.py`: Controlador principal y punto de entrada.
+*   `src/frontend/`: Interfaz gráfica (UI) construida con CustomTkinter.
+*   `src/backend/`: Lógica de base de datos (SQLite) y servicios de generación de archivos.

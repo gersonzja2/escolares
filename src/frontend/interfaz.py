@@ -181,11 +181,26 @@ class AppEscolar(ctk.CTk):
 
         ctk.CTkButton(frame, text="Guardar Configuración", command=self.solicitar_guardar_config).pack(pady=20)
         
+        # Sección Multi-Escuela
+        ctk.CTkLabel(frame, text="Gestión de Colegios", font=("Arial", 16, "bold")).pack(pady=(20, 10))
+        frame_escuelas = ctk.CTkFrame(frame, fg_color="transparent")
+        frame_escuelas.pack()
+        ctk.CTkButton(frame_escuelas, text="📂 Abrir Otra Escuela", command=self.controller.cargar_escuela).pack(side="left", padx=5)
+        ctk.CTkButton(frame_escuelas, text="➕ Crear Nueva Escuela", fg_color="green", command=self.controller.nueva_escuela).pack(side="left", padx=5)
+
         ctk.CTkLabel(frame, text="Mantenimiento", font=("Arial", 16, "bold")).pack(pady=(40, 10))
         ctk.CTkButton(frame, text="Crear Respaldo de Base de Datos (Backup)", fg_color="#E0A800", text_color="black", command=self.controller.realizar_backup).pack(pady=10)
 
     def cambiar_tema(self, new_mode):
         ctk.set_appearance_mode(new_mode)
+
+    def actualizar_ui_configuracion(self, nombre_escuela, mostrar_grafico):
+        self.entry_nombre_escuela.delete(0, 'end')
+        self.entry_nombre_escuela.insert(0, nombre_escuela)
+        if mostrar_grafico:
+            self.switch_grafico.select()
+        else:
+            self.switch_grafico.deselect()
 
     def setup_ui_apoderados(self):
         frame = self.tab_apoderados
@@ -422,6 +437,8 @@ class AppEscolar(ctk.CTk):
         for item in self.tree_alumnos.get_children():
             self.tree_alumnos.delete(item)
         for fila in datos:
+            # Reemplazar None con cadena vacía para visualización
+            fila = [x if x is not None else "" for x in fila]
             # fila viene como: (id, nombre, grado, fecha_reg, apo_nombre, apo_tel, apo_email)
             # UI espera: (ID, Nombre, Grado, Apoderado, Contacto)
             fila_ui = (fila[0], fila[1], fila[2], fila[4], fila[5])
