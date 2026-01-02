@@ -102,8 +102,8 @@ class AppEscolar(ctk.CTk):
         ctk.CTkLabel(frame_acciones, text="|", text_color="gray").pack(side="left", padx=10)
         
         ctk.CTkLabel(frame_acciones, text="Mes:").pack(side="left", padx=5)
-        self.combo_mes_dashboard = ctk.CTkComboBox(frame_acciones, values=self.controller.MESES, width=110, command=self.solicitar_actualizar_dashboard)
-        self.combo_mes_dashboard.set(self.controller.MESES[datetime.now().month - 1])
+        self.combo_mes_dashboard = ctk.CTkComboBox(frame_acciones, values=self.controller.meses, width=110, command=self.solicitar_actualizar_dashboard)
+        self.combo_mes_dashboard.set(self.controller.meses[datetime.now().month - 1])
         self.combo_mes_dashboard.pack(side="left", padx=5)
 
         ctk.CTkButton(frame_acciones, text="↻", width=40, fg_color="gray", command=self.solicitar_actualizar_dashboard).pack(side="left", padx=5)
@@ -183,6 +183,7 @@ class AppEscolar(ctk.CTk):
         self.entry_admin_tel.pack(pady=5)
         if hasattr(self.controller, 'admin_telefono'):
             self.entry_admin_tel.insert(0, self.controller.admin_telefono)
+        ctk.CTkButton(frame, text="📲 Probar WhatsApp", fg_color="#25D366", text_color="white", hover_color="#128C7E", width=200, command=self.controller.probar_whatsapp_config).pack(pady=5)
 
         ctk.CTkLabel(frame, text="Día de Cobranza Mensual (1-31):").pack(pady=5)
         self.entry_dia_cobranza = ctk.CTkEntry(frame, width=100)
@@ -550,7 +551,7 @@ class AppEscolar(ctk.CTk):
         self.combo_alu_pago.pack(pady=5)
 
         ctk.CTkLabel(panel_pago, text="Mes a Pagar:").pack(pady=5)
-        self.combo_mes = ctk.CTkComboBox(panel_pago, values=self.controller.MESES)
+        self.combo_mes = ctk.CTkComboBox(panel_pago, values=self.controller.meses)
         self.combo_mes.pack(pady=5)
         
         ctk.CTkLabel(panel_pago, text="Monto:").pack(pady=5)
@@ -568,10 +569,10 @@ class AppEscolar(ctk.CTk):
         # Sección de Reportes
         ctk.CTkLabel(panel_pago, text="--- Reportes ---", text_color="gray").pack(pady=(20, 5))
         ctk.CTkLabel(panel_pago, text="Mes de Corte:").pack(pady=2)
-        self.combo_mes_reporte = ctk.CTkComboBox(panel_pago, values=self.controller.MESES)
+        self.combo_mes_reporte = ctk.CTkComboBox(panel_pago, values=self.controller.meses)
         # Seleccionar mes actual por defecto
         mes_actual_idx = datetime.now().month - 1
-        self.combo_mes_reporte.set(self.controller.MESES[mes_actual_idx])
+        self.combo_mes_reporte.set(self.controller.meses[mes_actual_idx])
         self.combo_mes_reporte.pack(pady=5)
         ctk.CTkButton(panel_pago, text="Ver Morosos", fg_color="#D35B58", hover_color="#C72C41", command=self.solicitar_morosos).pack(pady=5)
         ctk.CTkButton(panel_pago, text="Exportar Historial CSV", fg_color="green", command=self.solicitar_exportar_pagos).pack(pady=5)
@@ -684,7 +685,7 @@ class AppEscolar(ctk.CTk):
         top.grab_set()
 
         ctk.CTkLabel(top, text="Mes:").pack(pady=5)
-        combo_mes = ctk.CTkComboBox(top, values=self.controller.MESES)
+        combo_mes = ctk.CTkComboBox(top, values=self.controller.meses)
         combo_mes.set(mes)
         combo_mes.pack(pady=5)
 

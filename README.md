@@ -1,74 +1,86 @@
 # Sistema de Gestión Escolar
 
-Aplicación de escritorio desarrollada en Python para la administración eficiente de instituciones educativas. Permite gestionar alumnos, apoderados, mensualidades y generar reportes financieros y académicos de manera sencilla y moderna.
+Aplicación de escritorio desarrollada en Python para la administración de escuelas, academias o talleres. Permite gestionar alumnos, apoderados, mensualidades y enviar recordatorios de cobranza automatizados vía WhatsApp.
 
-## Características Principales
+## 🚀 Características Principales
 
-*   **Gestión Integral:** Registro y administración de Alumnos y Apoderados.
-*   **Control de Pagos:** Seguimiento de mensualidades, historial de pagos y detección automática de morosos.
-*   **Soporte Multi-Escuela:** Capacidad para gestionar múltiples colegios utilizando bases de datos independientes.
-*   **Dashboard Interactivo:** Visualización de estadísticas clave (total alumnos, ingresos mensuales) y gráficos de distribución.
-*   **Reportes y Exportación:**
-    *   Generación de fichas de alumno en formato **PDF**.
-    *   Exportación de listas de alumnos, historiales de pago y reportes de morosidad a **CSV** (Excel).
-*   **Seguridad y Mantenimiento:**
-    *   **Respaldo Automático:** El sistema crea copias de seguridad automáticas (rotación de las últimas 10) en la carpeta `backups/` cada vez que se inicia el programa.
-    *   **Zona de Peligro:** Funcionalidades para el borrado masivo de datos (pagos, alumnos, apoderados) protegidas con confirmación.
+*   **Gestión de Alumnos:** Inscripción, edición y bajas.
+*   **Base de Datos:** Almacenamiento local seguro usando SQLite.
+*   **Control de Pagos:** Registro de mensualidades, generación de recibos PDF y reporte de morosos.
+*   **Dashboard:** Visualización gráfica de alumnos por grado e ingresos mensuales.
+*   **Automatización de WhatsApp:**
+    *   Envío de recordatorios de pago individuales.
+    *   Cobranza masiva a todos los morosos con un clic.
+    *   Anuncios generales a todos los apoderados.
+    *   **Configuración de espera ajustable** para conexiones lentas.
+*   **Seguridad:** Copias de seguridad (backup) automáticas al iniciar.
 
-## Requisitos del Sistema
+## 📋 Requisitos Previos
 
 *   Python 3.8 o superior.
-*   Librerías listadas en `requirements.txt`.
+*   Navegador Google Chrome o Microsoft Edge (para WhatsApp Web).
+*   Cuenta de WhatsApp activa vinculada en el navegador.
 
-## Instalación
+## 🛠️ Instalación
 
-1.  **Clonar el repositorio o descargar el código:**
-    ```bash
-    git clone <url-del-repositorio>
-    cd escolares
-    ```
+1.  Clonar o descargar este repositorio.
+2.  Abrir una terminal en la carpeta del proyecto.
+3.  (Opcional) Crear y activar un entorno virtual:
 
-2.  **Crear un entorno virtual (Recomendado):**
-    ```bash
-    python -m venv venv
-    # En Windows:
-    venv\Scripts\activate
-    # En Linux/Mac:
-    source venv/bin/activate
-    ```
+```bash
+python -m venv env
+# En Windows:
+.\env\Scripts\activate
+```
 
-3.  **Instalar dependencias:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+4.  Instalar las dependencias:
 
-## Uso
+```bash
+pip install -r requirements.txt
+```
 
-**Opción A: Ejecutar desde código fuente (Python)**
-Ejecute el archivo principal desde la carpeta raíz:
+## ▶️ Ejecución
+
+Para iniciar la aplicación, ejecuta el archivo principal:
 
 ```bash
 python src/main.py
 ```
 
-*   **Datos de Prueba:** Puede poblar el sistema con datos ficticios ejecutando `python src/datos_prueba.py`.
-*   **Configuración:** Desde la pestaña de configuración puede cambiar el nombre de la escuela, el tema visual y gestionar los archivos de base de datos.
+## ⚙️ Configuración de WhatsApp
 
-## Estructura del Proyecto
+La aplicación utiliza WhatsApp Web para enviar mensajes. Debido a que la velocidad de carga depende de tu PC e Internet, puedes ajustar el tiempo de espera para evitar errores.
 
-*   `src/main.py`: Controlador principal y punto de entrada.
-*   `src/frontend/`: Interfaz gráfica (UI) construida con CustomTkinter.
-*   `src/backend/`: Lógica de base de datos (SQLite) y servicios de generación de archivos.
+1.  Ve a la pestaña **Configuración** dentro de la aplicación.
+2.  Busca el control deslizante **"Tiempo de Espera WhatsApp"**.
+3.  Ajusta el valor (por defecto 20s).
+    *   Si tienes una PC rápida y buen internet: **10s - 15s**.
+    *   Si tu PC es lenta o el internet inestable: **30s - 40s**.
+4.  Presiona **"Guardar Configuración"**.
+5.  Usa el botón **"📲 Probar WhatsApp"** para verificar que funcione correctamente.
 
-## Generar Ejecutable Portable (.exe)
+> **Nota:** No utilices el mouse ni el teclado mientras se realiza el envío automático de mensajes.
 
-Para crear una versión que funcione en cualquier computador con Windows (sin necesidad de instalar Python):
+## 📦 Generar Ejecutable (.exe)
 
-1.  Ejecute el script de construcción:
-    ```bash
-    python build.py
-    ```
-2.  Se generará una carpeta `dist/SistemaEscolar`.
-3.  **Esa carpeta es su aplicación portable.** Puede copiarla completa a una memoria USB o a otro computador.
-4.  Para usar el programa, abra el archivo `SistemaEscolar.exe` que está dentro de esa carpeta.
-    *   *Importante: La carpeta contiene su base de datos (`escolares.db`). Si la mueve a otro PC, sus datos viajarán con ella.*
+Si deseas convertir la aplicación en un archivo ejecutable para Windows, utiliza PyInstaller:
+
+```bash
+pyinstaller --noconfirm --onefile --windowed --name "SistemaEscolar" --add-data "src;src" --icon "icono.ico" src/main.py
+```
+*(Asegúrate de tener un archivo `icono.ico` o elimina la opción `--icon`)*.
+
+## 📂 Estructura del Proyecto
+
+*   `src/main.py`: Controlador principal de la aplicación.
+*   `src/frontend/`: Interfaz gráfica (CustomTkinter).
+*   `src/backend/`: Lógica de base de datos y servicios (PDF, WhatsApp).
+*   `backups/`: Carpeta donde se guardan automáticamente las copias de seguridad de la base de datos.
+*   `config.json`: Archivo de configuración local (se genera automáticamente).
+
+## 📄 Licencia
+
+Este proyecto es de uso libre para fines educativos y de gestión interna.
+
+---
+Desarrollado con Python y CustomTkinter.

@@ -22,6 +22,8 @@ PyInstaller.__main__.run([
     '--collect-all=customtkinter',
     '--collect-all=reportlab',
     '--collect-all=matplotlib',
+    '--collect-all=pywhatkit',
+    '--hidden-import=PIL',
     
     # Incluir documentación en la carpeta del ejecutable (formato Windows: origen;destino)
     '--add-data=README.md;.',

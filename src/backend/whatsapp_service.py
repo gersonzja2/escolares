@@ -28,7 +28,7 @@ class WhatsAppService:
             pywhatkit.sendwhatmsg_instantly(
                 phone_no=numero, 
                 message=mensaje, 
-                wait_time=20, 
+                wait_time=15, 
                 tab_close=True,
                 close_time=5
             )

@@ -27,8 +27,6 @@ class SchoolController:
         # 1. Cargar configuración de persistencia (última DB usada)
         self.app_config = self._cargar_config_app()
         last_db = self.app_config.get("last_db_path")
-        # Configuración de espera para WhatsApp (default 15s para conexiones lentas)
-        self.whatsapp_wait = int(self.app_config.get("whatsapp_wait_time", 15))
         
         if last_db and os.path.exists(last_db):
             self.db = SchoolDB(last_db)
@@ -49,7 +47,7 @@ class SchoolController:
         # Cargar configuración
         self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Escuela Modelo"
         self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
-        self.admin_telefono = self.db.obtener_configuracion("admin_telefono") or ""
+        self.admin_telefono = self.db.obtener_configuracion("admin_telefono") or "+56959920613"
         self.dia_cobranza = int(self.db.obtener_configuracion("dia_cobranza") or "5")
         
         # Cargar inicio de clases desde DB (default: 2 -> Marzo)
@@ -437,6 +435,9 @@ class SchoolController:
         deuda_str = ", ".join(deuda)
         telefono = telefono.strip() if telefono else ""
 
+        # Limpiar teléfono (quitar espacios, guiones, paréntesis)
+        telefono = telefono.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
+
         # 3. Validar y Enviar
         if not telefono.startswith("+"):
             messagebox.showwarning("Formato Incorrecto", "El teléfono debe incluir código de país (Ej: +52...) para usar WhatsApp.")
@@ -468,7 +469,8 @@ class SchoolController:
             enviados = 0
             errores = 0
             for nombre, tel in apoderados:
-                tel = tel.strip()
+                # Limpieza profunda del teléfono
+                tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
                 if not tel.startswith("+"):
                     errores += 1
                     continue
@@ -478,13 +480,30 @@ class SchoolController:
                     enviados += 1
                 else:
                     errores += 1
+
                 # Espera de seguridad entre mensajes para dar tiempo al navegador
-                time.sleep(self.whatsapp_wait) 
+                time.sleep(12) 
             
             self.view.after(0, lambda: messagebox.showinfo("Reporte", f"Envío finalizado.\nEnviados: {enviados}\nFallidos/Sin formato: {errores}"))
             self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Envío masivo finalizado."))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def probar_whatsapp_config(self):
+        """Envía un mensaje de prueba al número indicado."""
+        tel_inicial = self.admin_telefono
+        tel = simpledialog.askstring("Prueba de WhatsApp", "Ingrese número destino (con código país, ej: +52...):", initialvalue=tel_inicial)
+        
+        if not tel: return
+        
+        # Limpiar espacios y guiones para validar correctamente
+        tel = tel.replace(" ", "").replace("-", "").strip()
+        
+        if not tel.startswith("+"):
+            messagebox.showwarning("Formato inválido", "El número debe comenzar con '+' seguido del código de país.")
+            return
+            
+        self._ejecutar_envio_whatsapp(tel, "Hola! Este es un mensaje de prueba de tu Sistema Escolar 🎓")
 
     def enviar_recordatorio_morosos_masivo(self):
         """Busca todos los alumnos con deuda y envía recordatorios a sus apoderados."""
@@ -512,7 +531,8 @@ class SchoolController:
             enviados = 0
             errores = 0
             for nombre_apo, tel, nombre_alu, deuda in morosos:
-                tel = tel.strip()
+                # Limpieza profunda del teléfono
+                tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
                 if not tel.startswith("+"):
                     errores += 1
                     continue
@@ -525,7 +545,8 @@ class SchoolController:
                     enviados += 1
                 else:
                     errores += 1
-                time.sleep(self.whatsapp_wait)
+
+                time.sleep(12)
             
             self.view.after(0, lambda: messagebox.showinfo("Reporte Cobranza", f"Proceso finalizado.\nEnviados: {enviados}\nFallidos: {errores}"))
             self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Cobranza masiva finalizada."))
@@ -591,6 +612,7 @@ class SchoolController:
         try:
             config = self._cargar_config_app()
             config["last_db_path"] = os.path.abspath(db_path)
+
             with open(self.CONFIG_FILE, 'w') as f:
                 json.dump(config, f, indent=4)
         except Exception as e:
@@ -632,11 +654,19 @@ class SchoolController:
             messagebox.showerror("Error", "No se detecta conexión a internet.")
             return
 
+        # Limpiar número de teléfono para evitar errores de formato
+        telefono = telefono.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
+
         self.view.mostrar_mensaje_estado("Abriendo WhatsApp Web, por favor espere...")
         
         def worker():
-            exito = WhatsAppService.enviar_mensaje(telefono, mensaje)
-            if exito:
+            try:
+                exito = WhatsAppService.enviar_mensaje(telefono, mensaje)
+            except Exception as e:
+                logging.error(f"Error en servicio WhatsApp: {e}")
+                exito = False
+
+            if exito is True:
                 self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Mensaje enviado (verifique su navegador)."))
             else:
                 self.view.after(0, lambda: messagebox.showerror("Error", "Fallo al enviar mensaje."))
