@@ -191,6 +191,16 @@ class AppEscolar(ctk.CTk):
         ctk.CTkLabel(frame, text="Mantenimiento", font=("Arial", 16, "bold")).pack(pady=(40, 10))
         ctk.CTkButton(frame, text="Crear Respaldo de Base de Datos (Backup)", fg_color="#E0A800", text_color="black", command=self.controller.realizar_backup).pack(pady=10)
 
+        # Zona de Peligro
+        ctk.CTkLabel(frame, text="Zona de Peligro (Borrado Masivo)", font=("Arial", 14, "bold"), text_color="#D35B58").pack(pady=(20, 10))
+        
+        frame_danger = ctk.CTkFrame(frame, fg_color="transparent")
+        frame_danger.pack()
+        
+        ctk.CTkButton(frame_danger, text="Borrar Todos los Pagos", fg_color="#D35B58", hover_color="#C72C41", width=180, command=self.controller.eliminar_todos_pagos).pack(side="left", padx=5)
+        ctk.CTkButton(frame_danger, text="Borrar Todos los Alumnos", fg_color="#D35B58", hover_color="#C72C41", width=180, command=self.controller.eliminar_todos_alumnos).pack(side="left", padx=5)
+        ctk.CTkButton(frame_danger, text="Borrar Todos los Apoderados", fg_color="#D35B58", hover_color="#C72C41", width=180, command=self.controller.eliminar_todos_apoderados).pack(side="left", padx=5)
+
     def cambiar_tema(self, new_mode):
         ctk.set_appearance_mode(new_mode)
 

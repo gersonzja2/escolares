@@ -361,6 +361,32 @@ class SchoolController:
         nombre_archivo = f"Reporte_{titulo_reporte.replace(' ', '_').replace('(', '').replace(')', '')}.csv"
         self._exportar_csv(datos, headers, nombre_archivo, "Guardar reporte de morosos")
 
+    # --- Métodos de Borrado Masivo ---
+
+    def eliminar_todos_pagos(self):
+        if messagebox.askyesno("Confirmar Eliminación", "ADVERTENCIA: ¿Está seguro de que desea eliminar TODOS los registros de pagos?\nEsta acción no se puede deshacer."):
+            self.db.eliminar_todos_pagos()
+            self.view.mostrar_mensaje_estado("Todos los pagos han sido eliminados.")
+            self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
+
+    def eliminar_todos_alumnos(self):
+        if messagebox.askyesno("Confirmar Eliminación", "ADVERTENCIA: ¿Está seguro de que desea eliminar TODOS los alumnos?\nEsto también eliminará todos los historiales de pago asociados.\nEsta acción no se puede deshacer."):
+            self.db.eliminar_todos_estudiantes()
+            self.view.mostrar_mensaje_estado("Todos los alumnos y sus pagos han sido eliminados.")
+            self.actualizar_alumnos()
+            self.actualizar_pagos_ui()
+            self.actualizar_dashboard()
+
+    def eliminar_todos_apoderados(self):
+        if messagebox.askyesno("Confirmar Eliminación", "ADVERTENCIA: ¿Está seguro de que desea eliminar TODOS los apoderados?\nEsta acción no se puede deshacer."):
+            try:
+                self.db.eliminar_todos_apoderados()
+                self.view.mostrar_mensaje_estado("Todos los apoderados han sido eliminados.")
+                self.actualizar_apoderados()
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+
     # --- Métodos Auxiliares ---
 
     def _validar_email(self, email: str) -> bool:

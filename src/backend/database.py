@@ -254,3 +254,20 @@ class SchoolDB:
     def obtener_alumnos_por_grado(self):
         query = "SELECT grado, COUNT(*) FROM estudiantes GROUP BY grado ORDER BY grado"
         return self.obtener_datos(query)
+
+    # --- Métodos de Borrado Masivo ---
+
+    def eliminar_todos_pagos(self):
+        self.ejecutar_query("DELETE FROM mensualidades")
+
+    def eliminar_todos_estudiantes(self):
+        # Eliminar pagos primero para mantener integridad referencial
+        self.ejecutar_query("DELETE FROM mensualidades")
+        self.ejecutar_query("DELETE FROM estudiantes")
+
+    def eliminar_todos_apoderados(self):
+        # Verificar si hay estudiantes registrados antes de borrar apoderados
+        count = self.obtener_datos("SELECT COUNT(*) FROM estudiantes")[0][0]
+        if count > 0:
+            raise Exception("No se pueden eliminar los apoderados porque existen alumnos registrados. Elimine los alumnos primero.")
+        self.ejecutar_query("DELETE FROM apoderados")
