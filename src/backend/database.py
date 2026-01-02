@@ -2,6 +2,7 @@ import sqlite3
 import os
 import sys
 from datetime import datetime
+import logging
 
 class SchoolDB:
     def __init__(self, db_name="escolares.db"):
@@ -74,13 +75,13 @@ class SchoolDB:
         # Migraciones: Agregar columnas a tablas existentes si no existen
         try:
             cursor.execute("ALTER TABLE apoderados ADD COLUMN fecha_registro TEXT")
-        except sqlite3.OperationalError: pass
+        except sqlite3.OperationalError: logging.info("Migración: Columna fecha_registro ya existe en apoderados")
         try:
             cursor.execute("ALTER TABLE estudiantes ADD COLUMN fecha_registro TEXT")
-        except sqlite3.OperationalError: pass
+        except sqlite3.OperationalError: logging.info("Migración: Columna fecha_registro ya existe en estudiantes")
         try:
             cursor.execute("ALTER TABLE mensualidades ADD COLUMN fecha_pago TEXT")
-        except sqlite3.OperationalError: pass
+        except sqlite3.OperationalError: logging.info("Migración: Columna fecha_pago ya existe en mensualidades")
         
         # Índices para mejorar rendimiento de búsquedas
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_estudiantes_nombre ON estudiantes(nombre)")
@@ -95,6 +96,9 @@ class SchoolDB:
             cursor = conn.cursor()
             cursor.execute(query, params)
             conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Error SQL ejecutando '{query}': {e}")
+            raise
         finally:
             conn.close()
 
@@ -105,6 +109,9 @@ class SchoolDB:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             return rows
+        except sqlite3.Error as e:
+            logging.error(f"Error SQL obteniendo datos '{query}': {e}")
+            return []
         finally:
             conn.close()
 

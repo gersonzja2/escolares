@@ -466,9 +466,13 @@ class SchoolController:
         self.view.mostrar_mensaje_estado("Iniciando envío masivo...")
         
         def worker():
+            total = len(apoderados)
             enviados = 0
             errores = 0
-            for nombre, tel in apoderados:
+            for i, (nombre, tel) in enumerate(apoderados, 1):
+                # Actualizar progreso en la UI
+                self.view.after(0, lambda idx=i: self.view.mostrar_mensaje_estado(f"Procesando {idx}/{total}: {nombre}..."))
+                
                 # Limpieza profunda del teléfono
                 tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
                 if not tel.startswith("+"):

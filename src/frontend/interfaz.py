@@ -32,6 +32,7 @@ class AppEscolar(ctk.CTk):
         # Barra de estado (Footer)
         self.lbl_estado = ctk.CTkLabel(self, text="Listo", anchor="w", text_color="gray")
         self.lbl_estado.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 10))
+        self._after_id_estado = None
 
         self.tab_inicio = self.tab_view.add("Inicio")
         self.tab_inscripcion = self.tab_view.add("Inscripción y Alumnos")
@@ -50,10 +51,15 @@ class AppEscolar(ctk.CTk):
         self.setup_ui_configuracion()
 
     def mostrar_mensaje_estado(self, mensaje, es_error=False):
+        # Cancelar el temporizador anterior si existe para evitar superposiciones
+        if self._after_id_estado:
+            self.after_cancel(self._after_id_estado)
+            self._after_id_estado = None
+            
         color = "red" if es_error else "green"
         self.lbl_estado.configure(text=mensaje, text_color=color)
         # Restaurar mensaje por defecto "Listo" después de 4 segundos (4000 ms)
-        self.after(4000, lambda: self.lbl_estado.configure(text="Listo", text_color="gray"))
+        self._after_id_estado = self.after(4000, lambda: self.lbl_estado.configure(text="Listo", text_color="gray"))
 
     def ordenar_columnas(self, tree, col, reverse):
         l = [(tree.set(k, col), k) for k in tree.get_children('')]

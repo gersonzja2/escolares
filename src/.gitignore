@@ -1,15 +1,20 @@
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 
-# Base de datos
-*.db
-
 # Entornos virtuales
-venv/
 env/
+venv/
 
-# IDEs y Sistema
-.vscode/
-.idea/
-.DS_Store
+# Archivos de configuración y logs
+config.json
+*.log
+
+# Base de datos y backups
+*.db
+backups/
+
+# PyInstaller / Compilación
+build/
+dist/
+*.spec
