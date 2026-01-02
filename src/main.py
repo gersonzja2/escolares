@@ -12,17 +12,23 @@ from typing import List, Optional, Any
 import sys
 import os
 import json
+import logging
+import locale
+import calendar
 
 class SchoolController:
-    MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    INICIO_CLASES_IDX = 2  # Marzo es el índice 2
     CONFIG_FILE = "config.json"
     BACKUP_DIR = "backups"
 
     def __init__(self):
+        # Configurar logging básico
+        logging.basicConfig(filename='app_escolar.log', level=logging.INFO, 
+                            format='%(asctime)s - %(levelname)s - %(message)s')
         # 1. Cargar configuración de persistencia (última DB usada)
         self.app_config = self._cargar_config_app()
         last_db = self.app_config.get("last_db_path")
+        # Configuración de espera para WhatsApp (default 15s para conexiones lentas)
+        self.whatsapp_wait = int(self.app_config.get("whatsapp_wait_time", 15))
         
         if last_db and os.path.exists(last_db):
             self.db = SchoolDB(last_db)
@@ -33,11 +39,21 @@ class SchoolController:
         self._guardar_config_app(self.db.db_path)
         self._crear_backup_automatico()
 
+        # Configurar meses dinámicamente
+        self._configurar_locale()
+        self.meses = [calendar.month_name[i].capitalize() for i in range(1, 13)]
+        # Fallback manual si el locale no funcionó (para asegurar español)
+        if self.meses[0].lower() == "january":
+            self.meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
         # Cargar configuración
         self.nombre_escuela = self.db.obtener_configuracion("nombre_escuela") or "Escuela Modelo"
         self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
         self.admin_telefono = self.db.obtener_configuracion("admin_telefono") or ""
         self.dia_cobranza = int(self.db.obtener_configuracion("dia_cobranza") or "5")
+        
+        # Cargar inicio de clases desde DB (default: 2 -> Marzo)
+        self.inicio_clases_idx = int(self.db.obtener_configuracion("inicio_clases_idx") or "2")
         
         # Pasamos 'self' (el controlador) a la vista
         self.view = AppEscolar(controller=self)
@@ -49,6 +65,16 @@ class SchoolController:
         self.actualizar_pagos_ui()
         self.actualizar_dashboard()
         
+    def _configurar_locale(self):
+        """Intenta configurar el locale a español para obtener nombres de meses."""
+        locales = ['es_ES.UTF-8', 'es_ES', 'Spanish_Spain', 'es_MX.UTF-8', 'es_MX']
+        for loc in locales:
+            try:
+                locale.setlocale(locale.LC_TIME, loc)
+                return
+            except locale.Error:
+                continue
+
     def iniciar(self):
         """Inicia el bucle principal de la interfaz gráfica."""
         self.view.mainloop()
@@ -57,7 +83,7 @@ class SchoolController:
         if mes_seleccionado:
             mes_actual = mes_seleccionado
         else:
-            mes_actual = self.MESES[datetime.now().month - 1]
+            mes_actual = self.meses[datetime.now().month - 1]
         
         total_alumnos, ingresos = self.db.obtener_estadisticas_dashboard(mes_actual)
         self.view.actualizar_tarjetas_dashboard(total_alumnos, ingresos, mes_actual)
@@ -124,6 +150,7 @@ class SchoolController:
             self.mostrar_grafico = (self.db.obtener_configuracion("mostrar_grafico") or "1") == "1"
             self.admin_telefono = self.db.obtener_configuracion("admin_telefono") or ""
             self.dia_cobranza = int(self.db.obtener_configuracion("dia_cobranza") or "5")
+            self.inicio_clases_idx = int(self.db.obtener_configuracion("inicio_clases_idx") or "2")
             
             # 3. Actualizar UI (Título y Configuración)
             self.view.title(f"Sistema de Gestión Escolar - {self.nombre_escuela}")
@@ -310,16 +337,17 @@ class SchoolController:
     def mostrar_reporte_morosos(self, mes_corte: str):
         # Lógica de ciclo escolar: Marzo (índice 2) a Diciembre
         try:
-            mes_actual_idx = self.MESES.index(mes_corte)
+            mes_actual_idx = self.meses.index(mes_corte)
         except ValueError:
             mes_actual_idx = datetime.now().month - 1
         
-        if mes_actual_idx < self.INICIO_CLASES_IDX:
-            messagebox.showinfo("Aviso", "El ciclo escolar comienza en Marzo. No hay reporte de morosidad disponible para Enero/Febrero.")
+        if mes_actual_idx < self.inicio_clases_idx:
+            mes_inicio = self.meses[self.inicio_clases_idx]
+            messagebox.showinfo("Aviso", f"El ciclo escolar comienza en {mes_inicio}. No hay reporte de morosidad disponible para meses anteriores.")
             return
 
         # Lista de meses que DEBERÍAN estar pagados a la fecha (ej: Marzo, Abril, Mayo...)
-        meses_requeridos = self.MESES[self.INICIO_CLASES_IDX : mes_actual_idx + 1]
+        meses_requeridos = self.meses[self.inicio_clases_idx : mes_actual_idx + 1]
         
         estudiantes = self.db.obtener_estudiantes_completo()
         pagos_raw = self.db.obtener_pagos_todos()
@@ -345,7 +373,7 @@ class SchoolController:
                 # Agregamos la columna de meses adeudados al final
                 lista_morosos.append((eid, nombre, grado, apo, tel, deuda_str))
 
-        titulo = f"Morosidad Acumulada (Marzo - {mes_corte})"
+        titulo = f"Morosidad Acumulada ({self.meses[self.inicio_clases_idx]} - {mes_corte})"
         self.view.mostrar_ventana_morosos(lista_morosos, titulo)
 
     def generar_recibo_pago(self, id_pago: int):
@@ -451,7 +479,7 @@ class SchoolController:
                 else:
                     errores += 1
                 # Espera de seguridad entre mensajes para dar tiempo al navegador
-                time.sleep(8) 
+                time.sleep(self.whatsapp_wait) 
             
             self.view.after(0, lambda: messagebox.showinfo("Reporte", f"Envío finalizado.\nEnviados: {enviados}\nFallidos/Sin formato: {errores}"))
             self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Envío masivo finalizado."))
@@ -497,7 +525,7 @@ class SchoolController:
                     enviados += 1
                 else:
                     errores += 1
-                time.sleep(8)
+                time.sleep(self.whatsapp_wait)
             
             self.view.after(0, lambda: messagebox.showinfo("Reporte Cobranza", f"Proceso finalizado.\nEnviados: {enviados}\nFallidos: {errores}"))
             self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Cobranza masiva finalizada."))
@@ -561,11 +589,12 @@ class SchoolController:
 
     def _guardar_config_app(self, db_path):
         try:
-            config = {"last_db_path": os.path.abspath(db_path)}
+            config = self._cargar_config_app()
+            config["last_db_path"] = os.path.abspath(db_path)
             with open(self.CONFIG_FILE, 'w') as f:
-                json.dump(config, f)
+                json.dump(config, f, indent=4)
         except Exception as e:
-            print(f"Error guardando config: {e}")
+            logging.error(f"Error guardando config: {e}")
 
     def _crear_backup_automatico(self):
         """Crea una copia de seguridad y mantiene solo las últimas 10."""
@@ -591,11 +620,12 @@ class SchoolController:
             archivos.sort(key=os.path.getmtime)
             
             while len(archivos) > 10:
-                os.remove(archivos[0]) # Borrar el más viejo
-                archivos.pop(0)
+                archivo_a_borrar = archivos.pop(0)
+                os.remove(archivo_a_borrar) # Borrar el más viejo
+                logging.info(f"Backup antiguo eliminado: {archivo_a_borrar}")
                 
         except Exception as e:
-            print(f"Error creando backup automático: {e}")
+            logging.error(f"Error creando backup automático: {e}")
 
     def _ejecutar_envio_whatsapp(self, telefono, mensaje):
         if not WhatsAppService.hay_internet():
@@ -645,10 +675,10 @@ class SchoolController:
         if now.day < self.dia_cobranza:
             mes_actual_idx -= 1
             
-        if mes_actual_idx < self.INICIO_CLASES_IDX:
+        if mes_actual_idx < self.inicio_clases_idx:
              return []
 
-        meses_requeridos = self.MESES[self.INICIO_CLASES_IDX : mes_actual_idx + 1]
+        meses_requeridos = self.meses[self.inicio_clases_idx : mes_actual_idx + 1]
         pagos = self.db.obtener_pagos_alumno(id_alumno)
         meses_pagados = {p[0] for p in pagos}
         
@@ -656,6 +686,9 @@ class SchoolController:
 
     def _validar_email(self, email: str) -> bool:
         # Regex mejorado para validación de email
+        if not email:
+            # Si el email es opcional y está vacío, se considera válido.
+            return True
         if email and not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
             return False
         return True
