@@ -120,6 +120,7 @@ class AppEscolar(ctk.CTk):
         
         ctk.CTkLabel(frame_comms, text="Comunicaciones WhatsApp:", font=("Arial", 14, "bold")).pack(side="left", padx=10)
         ctk.CTkButton(frame_comms, text="📢 Anuncio General", fg_color="#25D366", text_color="white", hover_color="#128C7E", command=self.controller.enviar_anuncio_general).pack(side="left", padx=5)
+        ctk.CTkButton(frame_comms, text="💲 Recordatorio Morosos", fg_color="#D35B58", text_color="white", hover_color="#C72C41", command=self.controller.enviar_recordatorio_morosos_masivo).pack(side="left", padx=5)
 
         # Gráfico de Alumnos por Grado
         self.frame_grafico = ctk.CTkFrame(self.tab_inicio, fg_color="transparent")
@@ -196,6 +197,12 @@ class AppEscolar(ctk.CTk):
         if hasattr(self.controller, 'dia_cobranza'):
             self.entry_dia_cobranza.insert(0, str(self.controller.dia_cobranza))
 
+        ctk.CTkLabel(frame, text="Mes de Inicio de Clases:").pack(pady=5)
+        self.combo_inicio_clases = ctk.CTkComboBox(frame, values=self.controller.meses)
+        self.combo_inicio_clases.pack(pady=5)
+        if hasattr(self.controller, 'inicio_clases_idx'):
+            self.combo_inicio_clases.set(self.controller.meses[self.controller.inicio_clases_idx])
+
         self.switch_grafico = ctk.CTkSwitch(frame, text="Mostrar Gráfico en Dashboard")
         self.switch_grafico.pack(pady=5)
         if getattr(self.controller, 'mostrar_grafico', True):
@@ -253,13 +260,17 @@ class AppEscolar(ctk.CTk):
     def cambiar_tema(self, new_mode):
         ctk.set_appearance_mode(new_mode)
 
-    def actualizar_ui_configuracion(self, nombre_escuela, mostrar_grafico, admin_tel, dia_cobranza):
+    def actualizar_ui_configuracion(self, nombre_escuela, mostrar_grafico, admin_tel, dia_cobranza, inicio_clases_idx):
         self.entry_nombre_escuela.delete(0, 'end')
         self.entry_nombre_escuela.insert(0, nombre_escuela)
         self.entry_admin_tel.delete(0, 'end')
         self.entry_admin_tel.insert(0, admin_tel)
         self.entry_dia_cobranza.delete(0, 'end')
         self.entry_dia_cobranza.insert(0, str(dia_cobranza))
+        
+        if 0 <= inicio_clases_idx < len(self.controller.meses):
+            self.combo_inicio_clases.set(self.controller.meses[inicio_clases_idx])
+            
         if mostrar_grafico:
             self.switch_grafico.select()
         else:
@@ -539,7 +550,8 @@ class AppEscolar(ctk.CTk):
             self.entry_nombre_escuela.get(), 
             self.switch_grafico.get(),
             self.entry_admin_tel.get(),
-            self.entry_dia_cobranza.get()
+            self.entry_dia_cobranza.get(),
+            self.combo_inicio_clases.get()
         )
 
     def setup_ui_pagos(self):
@@ -728,3 +740,32 @@ class AppEscolar(ctk.CTk):
         
         for fila in datos:
             tree.insert("", "end", values=fila)
+
+    def mostrar_ventana_edicion_mensaje(self, telefono, mensaje_inicial, callback_enviar):
+        top = ctk.CTkToplevel(self)
+        top.title("Editar Mensaje WhatsApp")
+        top.geometry("500x450")
+        
+        ctk.CTkLabel(top, text=f"Destinatario: {telefono}", font=("Arial", 14, "bold")).pack(pady=(20, 5))
+        ctk.CTkLabel(top, text="Personalice el mensaje antes de enviar:", text_color="gray").pack(pady=5)
+
+        txt_mensaje = ctk.CTkTextbox(top, width=450, height=250)
+        txt_mensaje.pack(pady=10)
+        txt_mensaje.insert("0.0", mensaje_inicial)
+
+        def enviar():
+            msg = txt_mensaje.get("0.0", "end").strip()
+            if not msg:
+                messagebox.showwarning("Aviso", "El mensaje no puede estar vacío.")
+                return
+            top.destroy()
+            callback_enviar(msg)
+
+        frame_btns = ctk.CTkFrame(top, fg_color="transparent")
+        frame_btns.pack(pady=20)
+        
+        ctk.CTkButton(frame_btns, text="Cancelar", fg_color="gray", command=top.destroy).pack(side="left", padx=10)
+        ctk.CTkButton(frame_btns, text="Enviar WhatsApp 🚀", fg_color="#25D366", hover_color="#128C7E", command=enviar).pack(side="left", padx=10)
+        
+        top.lift()
+        top.focus_force()

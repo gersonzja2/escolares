@@ -40,8 +40,8 @@ class SchoolController:
         # Configurar meses dinámicamente
         self._configurar_locale()
         self.meses = [calendar.month_name[i].capitalize() for i in range(1, 13)]
-        # Fallback manual si el locale no funcionó (para asegurar español)
-        if self.meses[0].lower() == "january":
+        # Fallback manual si el locale no funcionó o es otro idioma (para asegurar español y consistencia con DB)
+        if self.meses[0].lower() != "enero":
             self.meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
         # Cargar configuración
@@ -89,7 +89,7 @@ class SchoolController:
         if hasattr(self.view, 'actualizar_grafico_alumnos'):
             self.view.actualizar_grafico_alumnos()
 
-    def guardar_ajustes(self, nombre_escuela, mostrar_grafico, admin_tel, dia_cobranza):
+    def guardar_ajustes(self, nombre_escuela, mostrar_grafico, admin_tel, dia_cobranza, inicio_clases_str):
         if not nombre_escuela:
             messagebox.showerror("Error", "El nombre de la escuela no puede estar vacío")
             return
@@ -100,16 +100,24 @@ class SchoolController:
         except ValueError:
             messagebox.showerror("Error", "El día de cobranza debe ser un número entre 1 y 31")
             return
+            
+        try:
+            inicio_clases_idx = self.meses.index(inicio_clases_str)
+        except ValueError:
+            messagebox.showerror("Error", "Mes de inicio inválido")
+            return
 
         self.db.guardar_configuracion("nombre_escuela", nombre_escuela)
         self.db.guardar_configuracion("mostrar_grafico", "1" if mostrar_grafico else "0")
         self.db.guardar_configuracion("admin_telefono", admin_tel)
         self.db.guardar_configuracion("dia_cobranza", str(dia))
+        self.db.guardar_configuracion("inicio_clases_idx", str(inicio_clases_idx))
         
         self.nombre_escuela = nombre_escuela
         self.mostrar_grafico = mostrar_grafico
         self.admin_telefono = admin_tel
         self.dia_cobranza = dia
+        self.inicio_clases_idx = inicio_clases_idx
         
         self.view.mostrar_mensaje_estado("Configuración guardada correctamente")
         self.actualizar_dashboard()
@@ -152,7 +160,7 @@ class SchoolController:
             
             # 3. Actualizar UI (Título y Configuración)
             self.view.title(f"Sistema de Gestión Escolar - {self.nombre_escuela}")
-            self.view.actualizar_ui_configuracion(self.nombre_escuela, self.mostrar_grafico, self.admin_telefono, self.dia_cobranza)
+            self.view.actualizar_ui_configuracion(self.nombre_escuela, self.mostrar_grafico, self.admin_telefono, self.dia_cobranza, self.inicio_clases_idx)
 
             # 4. Refrescar datos de las tablas y dashboard
             self.actualizar_apoderados()
@@ -443,12 +451,75 @@ class SchoolController:
             messagebox.showwarning("Formato Incorrecto", "El teléfono debe incluir código de país (Ej: +52...) para usar WhatsApp.")
             return
 
-        mensaje = (f"Estimado/a {nombre_apo}, le recordamos que el alumno {nombre_alu} "
-                    f"tiene pendientes las mensualidades de: {deuda_str}. "
-                    f"Favor regularizar. Atte, {self.nombre_escuela}")
+        # Calcular variables para el mensaje
+        fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+        
+        hoy = datetime.now()
+        # Calcula la fecha límite ajustando el último día del mes si es necesario
+        dia_limite = self.dia_cobranza
+        ultimo_dia_mes = calendar.monthrange(hoy.year, hoy.month)[1]
+        if dia_limite > ultimo_dia_mes:
+            dia_limite = ultimo_dia_mes
+        fecha_limite = datetime(hoy.year, hoy.month, dia_limite).strftime("%d/%m/%Y")
 
-        if messagebox.askyesno("Enviar WhatsApp", f"¿Enviar recordatorio a {telefono}?\n\nMensaje: {mensaje}"):
-            self._ejecutar_envio_whatsapp(telefono, mensaje)
+        mensaje = (f"Estimado/a {nombre_apo}, le saludamos de {self.nombre_escuela}.\n\n"
+                    f"Le recordamos que el alumno {nombre_alu} mantiene mensualidades pendientes: {deuda_str}.\n"
+                    f"💰 Monto Total: $ [EDITAR MONTO]\n"
+                    f"📅 Fecha Límite: {fecha_limite}\n\n"
+                    f"Favor regularizar a la brevedad. Fecha emisión: {fecha_hoy}.")
+
+        self.view.mostrar_ventana_edicion_mensaje(telefono, mensaje, lambda msg: self._ejecutar_envio_whatsapp(telefono, msg))
+
+    def enviar_recordatorio_morosos_masivo(self):
+        """Busca todos los alumnos con deuda y envía recordatorios a sus apoderados."""
+        estudiantes = self.db.obtener_estudiantes_completo()
+        morosos = []
+        
+        # Filtrar quiénes tienen deuda
+        for est in estudiantes:
+            # est: id, nombre, grado, fecha, nombre_apo, tel, email
+            id_alu, nombre_alu, _, _, nombre_apo, tel, _ = est
+            deuda = self._calcular_deuda_alumno(id_alu)
+            if deuda and tel:
+                morosos.append((nombre_apo, tel, nombre_alu, deuda))
+        
+        if not morosos:
+            messagebox.showinfo("Info", "No se encontraron alumnos con deuda y teléfono registrado.")
+            return
+
+        if not messagebox.askyesno("Confirmar Cobranza Masiva", f"Se encontraron {len(morosos)} alumnos morosos con teléfono.\n¿Desea enviar los recordatorios por WhatsApp?"):
+            return
+
+        self.view.mostrar_mensaje_estado("Iniciando cobranza masiva...")
+        
+        def worker():
+            total = len(morosos)
+            enviados = 0
+            errores = 0
+            for i, (nombre_apo, tel, nombre_alu, deuda) in enumerate(morosos, 1):
+                self.view.after(0, lambda idx=i, nom=nombre_alu: self.view.mostrar_mensaje_estado(f"Procesando {idx}/{total}: {nom}..."))
+
+                # Limpieza profunda del teléfono
+                tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
+                if not tel.startswith("+"):
+                    errores += 1
+                    continue
+                
+                deuda_str = ", ".join(deuda)
+                mensaje = (f"Estimado/a {nombre_apo}, le recordamos que el alumno {nombre_alu} "
+                           f"tiene pendientes: {deuda_str}. Favor regularizar. Atte, {self.nombre_escuela}")
+                
+                if WhatsAppService.enviar_mensaje(tel, mensaje):
+                    enviados += 1
+                else:
+                    errores += 1
+
+                time.sleep(12)
+            
+            self.view.after(0, lambda: messagebox.showinfo("Reporte Cobranza", f"Proceso finalizado.\nEnviados: {enviados}\nFallidos: {errores}"))
+            self.view.after(0, lambda: self.view.mostrar_mensaje_estado("Cobranza masiva finalizada."))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def enviar_anuncio_general(self):
         """Envía un mensaje a todos los apoderados registrados."""
@@ -658,8 +729,9 @@ class SchoolController:
         mes_actual_idx = now.month - 1
         
         # Si el día actual es menor al día de cobranza, el mes actual no se considera deuda
-        if now.day < self.dia_cobranza:
-            mes_actual_idx -= 1
+        # Se comenta para que el mes actual sea exigible desde el día 1
+        # if now.day < self.dia_cobranza:
+        #     mes_actual_idx -= 1
             
         if mes_actual_idx < self.inicio_clases_idx:
             return []
