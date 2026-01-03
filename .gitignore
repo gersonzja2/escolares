@@ -19,3 +19,16 @@ env/
 .vscode/
 .idea/
 .DS_Store
+
+# Configuración y Datos Locales
+config.json
+backups/
+
+# Archivos Generados (Reportes)
+*.pdf
+*.csv
+
+# PyInstaller / Compilación
+dist/
+build/
+*.spec

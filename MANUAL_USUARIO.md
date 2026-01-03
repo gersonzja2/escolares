@@ -43,6 +43,7 @@ Aquí encontrará un resumen visual del estado del colegio.
 ### B. Pestaña Apoderados
 **Importante**: Antes de inscribir un alumno, debe existir un apoderado registrado.
 1.  **Registrar Nuevo**: Complete Nombre, Teléfono y Email en el formulario izquierdo y presione "Guardar Apoderado".
+    *   *Nota: Para las funciones de WhatsApp, ingrese el teléfono en formato internacional (ej: +521234567890).*
 2.  **Editar**: Haga doble clic sobre un apoderado en la tabla de la derecha para modificar sus datos.
 3.  **Eliminar**: Seleccione un apoderado de la lista y presione "Eliminar Seleccionado". *Nota: No puede eliminar un apoderado si tiene alumnos asociados.*
 
@@ -70,15 +71,23 @@ Aquí encontrará un resumen visual del estado del colegio.
     *   Presione "Ver Morosos".
     *   El sistema mostrará quiénes deben mensualidades desde Marzo hasta el mes seleccionado.
     *   Puede exportar esta lista a Excel (CSV).
+5.  **Cobranza Masiva (WhatsApp)**:
+    *   Busca automáticamente a todos los alumnos con deuda y teléfono válido.
+    *   Envía un mensaje recordatorio a cada apoderado.
+    *   *Requiere conexión a internet y WhatsApp Web.*
 
 ### E. Pestaña Configuración
-1.  **Datos de la Escuela**: Cambie el nombre que aparece en los reportes PDF.
+1.  **Parámetros Generales**:
+    *   **Nombre de la Escuela**: Aparece en los reportes PDF.
+    *   **Día de Cobranza**: Día del mes considerado como fecha límite de pago.
+    *   **Inicio de Clases**: Mes desde el cual se comienza a calcular la morosidad.
+    *   **Teléfono Admin**: Número utilizado para pruebas de envío de mensajes.
 2.  **Apariencia**: Cambie entre modo Claro (Light), Oscuro (Dark) o Sistema.
 3.  **Gestión Multi-Escuela**:
     *   **Crear Nueva Escuela**: Crea una base de datos vacía para administrar otro colegio por separado.
     *   **Abrir Otra Escuela**: Cambia la base de datos actual por otra existente.
 4.  **Respaldo (Backup)**: Crea una copia de seguridad de todos sus datos actuales.
-    *   *Nota: El sistema también crea respaldos automáticos en la carpeta `backups/` (ubicada junto al ejecutable) cada vez que se inicia.*
+    *   *Nota: El sistema crea respaldos automáticos en la carpeta `backups/` al iniciar, manteniendo un historial rotativo de las últimas 10 versiones.*
 5.  **Zona de Peligro**: Botones para borrar masivamente todos los pagos, alumnos o apoderados.
     *   **Advertencia**: Estas acciones no se pueden deshacer. Úselas solo si necesita reiniciar el sistema o limpiar datos de prueba.
 

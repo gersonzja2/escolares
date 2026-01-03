@@ -1,85 +1,67 @@
 # Sistema de Gestión Escolar
 
-Aplicación de escritorio desarrollada en Python para la administración de escuelas, academias o talleres. Permite gestionar alumnos, apoderados, mensualidades y enviar recordatorios de cobranza automatizados vía WhatsApp.
+Aplicación de escritorio desarrollada en Python para la administración de escuelas, gestión de alumnos, control de mensualidades y comunicación con apoderados vía WhatsApp.
 
-## 🚀 Características Principales
+## Características Principales
 
-*   **Gestión de Alumnos:** Inscripción, edición y bajas.
-*   **Base de Datos:** Almacenamiento local seguro usando SQLite.
-*   **Control de Pagos:** Registro de mensualidades, generación de recibos PDF y reporte de morosos.
-*   **Dashboard:** Visualización gráfica de alumnos por grado e ingresos mensuales.
-*   **Automatización de WhatsApp:**
-    *   Envío de recordatorios de pago individuales.
-    *   Anuncios generales a todos los apoderados.
-    *   **Configuración de espera ajustable** para conexiones lentas.
-*   **Seguridad:** Copias de seguridad (backup) automáticas al iniciar.
+### 1. Gestión Académica
+- **Registro de Alumnos:** Inscripción de estudiantes con asignación de grado y apoderado.
+- **Base de Datos de Apoderados:** Gestión de contactos (teléfono, email) para comunicación.
+- **Búsqueda:** Filtrado rápido de alumnos y apoderados.
 
-## 📋 Requisitos Previos
+### 2. Control Financiero
+- **Registro de Pagos:** Control de mensualidades por alumno.
+- **Historial:** Visualización completa del historial de pagos.
+- **Recibos:** Generación automática de recibos en formato PDF.
+- **Reporte de Morosidad:** Detección automática de alumnos con deudas basado en el ciclo escolar configurado.
 
-*   Python 3.8 o superior.
-*   Navegador Google Chrome o Microsoft Edge (para WhatsApp Web).
-*   Cuenta de WhatsApp activa vinculada en el navegador.
+### 3. Comunicación y Notificaciones
+- **Integración con WhatsApp:**
+  - Envío de recordatorios de pago individuales.
+  - Cobranza masiva a todos los morosos con un solo clic.
+  - Anuncios generales a todos los apoderados.
+- **Validación de Contactos:** Limpieza y validación automática de números telefónicos.
 
-## 🛠️ Instalación
+### 4. Seguridad y Mantenimiento
+- **Base de Datos:** SQLite local (`escolares.db`).
+- **Backups Automáticos:** El sistema crea copias de seguridad automáticas en la carpeta `backups/` al iniciar, manteniendo un historial rotativo de las últimas 10 versiones.
+- **Migraciones:** Sistema de actualización automática de la estructura de la base de datos.
 
-1.  Clonar o descargar este repositorio.
-2.  Abrir una terminal en la carpeta del proyecto.
-3.  (Opcional) Crear y activar un entorno virtual:
+## Requisitos del Sistema
 
-```bash
-python -m venv env
-# En Windows:
-.\env\Scripts\activate
+- Python 3.8 o superior.
+- Librerías necesarias (instalar vía `pip` si no se usa el ejecutable):
+  - `tkinter` (incluido en Python)
+  - `sqlite3` (incluido en Python)
+  - `reportlab` (para generación de PDFs)
+  - `pywhatkit` o similar (según implementación de `WhatsAppService`)
+
+## Estructura del Proyecto
+
+```
+escolares/
+├── backups/            # Copias de seguridad automáticas
+├── src/
+│   ├── main.py         # Punto de entrada de la aplicación (Controlador)
+│   ├── backend/
+│   │   ├── database.py # Lógica de base de datos y migraciones
+│   │   ├── services.py # Generación de reportes PDF/CSV
+│   │   └── whatsapp_service.py
+│   └── frontend/
+│       └── interfaz.py # Interfaz gráfica (Tkinter)
+├── config.json         # Configuración de usuario (se genera automáticamente)
+└── escolares.db        # Base de datos principal
 ```
 
-4.  Instalar las dependencias:
+## Configuración
 
-```bash
-pip install -r requirements.txt
-```
+Al iniciar la aplicación por primera vez, se pueden configurar los siguientes parámetros desde la interfaz:
+- **Nombre de la Escuela.**
+- **Día de Cobranza:** Día del mes límite para los pagos.
+- **Inicio de Clases:** Mes en el que inicia el ciclo escolar (para cálculo de morosidad).
+- **Teléfono Administrador:** Para pruebas de envío de mensajes.
 
-## ▶️ Ejecución
+## Notas de Desarrollo
 
-Para iniciar la aplicación, ejecuta el archivo principal:
-
-```bash
-python src/main.py
-```
-
-## ⚙️ Configuración de WhatsApp
-
-La aplicación utiliza WhatsApp Web para enviar mensajes. Debido a que la velocidad de carga depende de tu PC e Internet, puedes ajustar el tiempo de espera para evitar errores.
-
-1.  Ve a la pestaña **Configuración** dentro de la aplicación.
-2.  Busca el control deslizante **"Tiempo de Espera WhatsApp"**.
-3.  Ajusta el valor (por defecto 20s).
-    *   Si tienes una PC rápida y buen internet: **10s - 15s**.
-    *   Si tu PC es lenta o el internet inestable: **30s - 40s**.
-4.  Presiona **"Guardar Configuración"**.
-5.  Usa el botón **"📲 Probar WhatsApp"** para verificar que funcione correctamente.
-
-> **Nota:** No utilices el mouse ni el teclado mientras se realiza el envío automático de mensajes.
-
-## 📦 Generar Ejecutable (.exe)
-
-Si deseas convertir la aplicación en un archivo ejecutable para Windows, utiliza PyInstaller:
-
-```bash
-pyinstaller --noconfirm --onefile --windowed --name "SistemaEscolar" --add-data "src;src" --icon "icono.ico" src/main.py
-```
-*(Asegúrate de tener un archivo `icono.ico` o elimina la opción `--icon`)*.
-
-## 📂 Estructura del Proyecto
-
-*   `src/main.py`: Controlador principal de la aplicación.
-*   `src/frontend/`: Interfaz gráfica (CustomTkinter).
-*   `src/backend/`: Lógica de base de datos y servicios (PDF, WhatsApp).
-*   `backups/`: Carpeta donde se guardan automáticamente las copias de seguridad de la base de datos.
-*   `config.json`: Archivo de configuración local (se genera automáticamente).
-
-## 📄 Licencia
-
-Este proyecto es de uso libre para fines educativos y de gestión interna.
-
----
-Desarrollado con Python y CustomTkinter.
+- El sistema detecta automáticamente si se está ejecutando como script (`.py`) o como ejecutable congelado (PyInstaller), ajustando las rutas de recursos y base de datos automáticamente.
+- Los procesos pesados (generación de PDF, envíos masivos de WhatsApp) se ejecutan en hilos secundarios para no congelar la interfaz.

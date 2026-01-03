@@ -443,11 +443,9 @@ class SchoolController:
         deuda_str = ", ".join(deuda)
         telefono = telefono.strip() if telefono else ""
 
-        # Limpiar teléfono (quitar espacios, guiones, paréntesis)
-        telefono = telefono.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
-
-        # 3. Validar y Enviar
-        if not telefono.startswith("+"):
+        # 3. Validar y Enviar (Usando helper centralizado)
+        telefono = self._limpiar_telefono(telefono)
+        if not telefono:
             messagebox.showwarning("Formato Incorrecto", "El teléfono debe incluir código de país (Ej: +52...) para usar WhatsApp.")
             return
 
@@ -499,9 +497,9 @@ class SchoolController:
             for i, (nombre_apo, tel, nombre_alu, deuda) in enumerate(morosos, 1):
                 self.view.after(0, lambda idx=i, nom=nombre_alu: self.view.mostrar_mensaje_estado(f"Procesando {idx}/{total}: {nom}..."))
 
-                # Limpieza profunda del teléfono
-                tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
-                if not tel.startswith("+"):
+                # Limpieza profunda del teléfono usando helper
+                tel = self._limpiar_telefono(tel)
+                if not tel:
                     errores += 1
                     continue
                 
@@ -544,9 +542,9 @@ class SchoolController:
                 # Actualizar progreso en la UI
                 self.view.after(0, lambda idx=i: self.view.mostrar_mensaje_estado(f"Procesando {idx}/{total}: {nombre}..."))
                 
-                # Limpieza profunda del teléfono
-                tel = tel.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
-                if not tel.startswith("+"):
+                # Limpieza profunda del teléfono usando helper
+                tel = self._limpiar_telefono(tel)
+                if not tel:
                     errores += 1
                     continue
                 
@@ -571,10 +569,8 @@ class SchoolController:
         
         if not tel: return
         
-        # Limpiar espacios y guiones para validar correctamente
-        tel = tel.replace(" ", "").replace("-", "").strip()
-        
-        if not tel.startswith("+"):
+        tel = self._limpiar_telefono(tel)
+        if not tel:
             messagebox.showwarning("Formato inválido", "El número debe comenzar con '+' seguido del código de país.")
             return
             
@@ -681,9 +677,8 @@ class SchoolController:
             messagebox.showerror("Error", "No se detecta conexión a internet.")
             return
 
-        # Limpiar número de teléfono para evitar errores de formato
-        telefono = telefono.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
-
+        # El teléfono ya debería venir limpio, pero por seguridad:
+        telefono = self._limpiar_telefono(telefono)
         self.view.mostrar_mensaje_estado("Abriendo WhatsApp Web, por favor espere...")
         
         def worker():
@@ -702,6 +697,16 @@ class SchoolController:
 
     # --- Métodos Auxiliares ---
 
+    def _limpiar_telefono(self, telefono: str) -> Optional[str]:
+        """Limpia el formato del teléfono y valida que empiece con +."""
+        if not telefono:
+            return None
+        # Quitar espacios, guiones, paréntesis
+        limpio = telefono.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
+        if limpio.startswith("+"):
+            return limpio
+        return None
+
     def _validar_datos_apoderado(self, nombre: str, tel: str, email: str) -> Optional[tuple]:
         nombre = nombre.strip() if nombre else ""
         tel = tel.strip() if tel else ""
@@ -712,11 +717,14 @@ class SchoolController:
             return None
         
         if tel:
-            if not re.match(r"^\+[\d\s-]+$", tel):
-                messagebox.showwarning("Aviso", "Se recomienda usar el formato internacional (+52...) para las funciones de WhatsApp.")
-            elif not re.match(r"^\+?[\d\s-]+$", tel):
+            # 1. Validar caracteres permitidos (dígitos, espacios, guiones, paréntesis)
+            if not re.match(r"^\+?[\d\s\(\)-]+$", tel):
                 messagebox.showerror("Error", "El teléfono contiene caracteres inválidos")
                 return None
+            
+            # 2. Advertencia de formato internacional
+            if not re.match(r"^\+[\d\s\(\)-]+$", tel):
+                messagebox.showwarning("Aviso", "Se recomienda usar el formato internacional (+52...) para las funciones de WhatsApp.")
 
         if not self._validar_email(email):
             messagebox.showerror("Error", "El formato del email es inválido (ej: correo@dominio.com)")

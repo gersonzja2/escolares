@@ -14,7 +14,8 @@ class SchoolDB:
         else:
             # Si es script (desarrollo), guardar en la carpeta raíz del proyecto
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            self.db_path = os.path.join(base_dir, "..", db_name)
+            self.db_path = os.path.join(base_dir, "..", "..", db_name)
+            
             
         self.init_db()
 
@@ -149,11 +150,16 @@ class SchoolDB:
 
     def eliminar_estudiante(self, estudiante_id):
         conn = self._conectar()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM mensualidades WHERE estudiante_id = ?", (estudiante_id,))
-        cursor.execute("DELETE FROM estudiantes WHERE id = ?", (estudiante_id,))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM mensualidades WHERE estudiante_id = ?", (estudiante_id,))
+            cursor.execute("DELETE FROM estudiantes WHERE id = ?", (estudiante_id,))
+            conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Error eliminando estudiante {estudiante_id}: {e}")
+            raise
+        finally:
+            conn.close()
 
     def actualizar_estudiante(self, id, nombre, grado, apoderado_id):
         self.ejecutar_query("UPDATE estudiantes SET nombre=?, grado=?, apoderado_id=? WHERE id=?", (nombre, grado, apoderado_id, id))
