@@ -3,6 +3,7 @@ import os
 import sys
 from datetime import datetime
 import logging
+import threading
 
 class SchoolDB:
     def __init__(self, db_name="escolares.db"):
@@ -16,13 +17,23 @@ class SchoolDB:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             self.db_path = os.path.join(base_dir, "..", "..", db_name)
             
-            
+        self._conn = None
+        self._lock = threading.Lock()
         self.init_db()
 
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._conn:
+            self._conn.close()
+            self._conn = None
+
     def _conectar(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA foreign_keys = ON")
-        return conn
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path, timeout=10, check_same_thread=False)
+            self._conn.execute("PRAGMA foreign_keys = ON")
+        return self._conn
 
     def init_db(self):
         conn = self._conectar()
@@ -89,32 +100,28 @@ class SchoolDB:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_mensualidades_fecha ON mensualidades(fecha_pago)")
         
         conn.commit()
-        conn.close()
 
     def ejecutar_query(self, query, params=()):
-        conn = self._conectar()
-        try:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            conn.commit()
-        except sqlite3.Error as e:
-            logging.error(f"Error SQL ejecutando '{query}': {e}")
-            raise
-        finally:
-            conn.close()
+        with self._lock:
+            conn = self._conectar()
+            try:
+                with conn:
+                    conn.execute(query, params)
+            except sqlite3.Error as e:
+                logging.error(f"Error SQL ejecutando '{query}': {e}")
+                raise
 
     def obtener_datos(self, query, params=()):
-        conn = self._conectar()
-        try:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            return rows
-        except sqlite3.Error as e:
-            logging.error(f"Error SQL obteniendo datos '{query}': {e}")
-            return []
-        finally:
-            conn.close()
+        with self._lock:
+            conn = self._conectar()
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                return rows
+            except sqlite3.Error as e:
+                logging.error(f"Error SQL obteniendo datos '{query}': {e}")
+                return []
 
     # --- Métodos Específicos ---
     
@@ -149,17 +156,15 @@ class SchoolDB:
         self.ejecutar_query("INSERT INTO estudiantes (nombre, grado, apoderado_id, fecha_registro) VALUES (?, ?, ?, ?)", (nombre, grado, apoderado_id, fecha))
 
     def eliminar_estudiante(self, estudiante_id):
-        conn = self._conectar()
-        try:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM mensualidades WHERE estudiante_id = ?", (estudiante_id,))
-            cursor.execute("DELETE FROM estudiantes WHERE id = ?", (estudiante_id,))
-            conn.commit()
-        except sqlite3.Error as e:
-            logging.error(f"Error eliminando estudiante {estudiante_id}: {e}")
-            raise
-        finally:
-            conn.close()
+        with self._lock:
+            conn = self._conectar()
+            try:
+                with conn:
+                    conn.execute("DELETE FROM mensualidades WHERE estudiante_id = ?", (estudiante_id,))
+                    conn.execute("DELETE FROM estudiantes WHERE id = ?", (estudiante_id,))
+            except sqlite3.Error as e:
+                logging.error(f"Error eliminando estudiante {estudiante_id}: {e}")
+                raise
 
     def actualizar_estudiante(self, id, nombre, grado, apoderado_id):
         self.ejecutar_query("UPDATE estudiantes SET nombre=?, grado=?, apoderado_id=? WHERE id=?", (nombre, grado, apoderado_id, id))
@@ -275,19 +280,19 @@ class SchoolDB:
         self.ejecutar_query("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
 
     def obtener_estadisticas_dashboard(self, mes_nombre):
-        conn = self._conectar()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM estudiantes")
-        total_alumnos = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT SUM(monto) FROM mensualidades WHERE mes = ?", (mes_nombre,))
-        res_ingresos = cursor.fetchone()[0]
-        ingresos = res_ingresos if res_ingresos else 0.0
-
-        conn.close()
-        
-        return total_alumnos, ingresos
+        try:
+            # Reutilizamos obtener_datos para mantener el manejo de errores y logging consistente
+            res_alumnos = self.obtener_datos("SELECT COUNT(*) FROM estudiantes")
+            total_alumnos = res_alumnos[0][0] if res_alumnos else 0
+            
+            res_ingresos = self.obtener_datos("SELECT SUM(monto) FROM mensualidades WHERE mes = ?", (mes_nombre,))
+            # Verificamos si hay resultado y si no es None (SUM devuelve None si no hay filas)
+            ingresos = res_ingresos[0][0] if res_ingresos and res_ingresos[0][0] else 0.0
+            
+            return total_alumnos, ingresos
+        except Exception as e:
+            logging.error(f"Error obteniendo estadísticas: {e}")
+            return 0, 0.0
 
     def obtener_alumnos_por_grado(self):
         query = "SELECT grado, COUNT(*) FROM estudiantes GROUP BY grado ORDER BY grado"
@@ -299,9 +304,16 @@ class SchoolDB:
         self.ejecutar_query("DELETE FROM mensualidades")
 
     def eliminar_todos_estudiantes(self):
-        # Eliminar pagos primero para mantener integridad referencial
-        self.ejecutar_query("DELETE FROM mensualidades")
-        self.ejecutar_query("DELETE FROM estudiantes")
+        with self._lock:
+            conn = self._conectar()
+            try:
+                with conn:
+                    # Eliminar pagos primero para mantener integridad referencial
+                    conn.execute("DELETE FROM mensualidades")
+                    conn.execute("DELETE FROM estudiantes")
+            except sqlite3.Error as e:
+                logging.error(f"Error eliminando todos los estudiantes: {e}")
+                raise
 
     def eliminar_todos_apoderados(self):
         # Verificar si hay estudiantes registrados antes de borrar apoderados

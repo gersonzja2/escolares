@@ -58,3 +58,18 @@
 2026-01-03 16:09:51,836 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
 2026-01-03 16:09:51,836 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
 2026-01-03 16:09:51,839 - INFO - Backup antiguo eliminado: backups\agricola_auto_20260102_201633.db
+2026-01-03 22:37:53,627 - INFO - Migración: Columna fecha_registro ya existe en apoderados
+2026-01-03 22:37:53,628 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
+2026-01-03 22:37:53,628 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
+2026-01-03 22:37:53,630 - INFO - Backup antiguo eliminado: backups\escolares_auto_20260102_231334.db
+2026-01-03 22:38:04,355 - WARNING - Imagen c:\Users\user\Documents\escolares\src\backend\..\assets\send_button.png no encontrada. Usando espera fija (20s).
+2026-01-03 22:44:58,904 - INFO - Migración: Columna fecha_registro ya existe en apoderados
+2026-01-03 22:44:58,904 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
+2026-01-03 22:44:58,904 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
+2026-01-03 22:44:58,906 - INFO - Backup antiguo eliminado: backups\escolares_auto_20260102_232712.db
+2026-01-03 22:45:16,577 - INFO - Iniciando validación visual para envío...
+2026-01-03 22:46:26,640 - INFO - Migración: Columna fecha_registro ya existe en apoderados
+2026-01-03 22:46:26,640 - INFO - Migración: Columna fecha_registro ya existe en estudiantes
+2026-01-03 22:46:26,640 - INFO - Migración: Columna fecha_pago ya existe en mensualidades
+2026-01-03 22:46:26,643 - INFO - Backup antiguo eliminado: backups\escolares_auto_20260103_160744.db
+2026-01-03 22:46:34,512 - WARNING - Imagen c:\Users\user\Documents\escolares\src\backend\..\assets\send_button.png no encontrada. Usando espera fija (20s).

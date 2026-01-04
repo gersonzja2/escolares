@@ -302,6 +302,7 @@ class SchoolController:
             return
         
         try:
+            monto = monto.replace(',', '.')
             monto_float = float(monto)
             if monto_float <= 0:
                 messagebox.showerror("Error", "El monto debe ser un número positivo mayor a 0")
@@ -327,6 +328,7 @@ class SchoolController:
 
     def modificar_pago(self, id_pago: int, monto: str, mes: str, window: Any):
         try:
+            monto = monto.replace(',', '.')
             monto_float = float(monto)
             if monto_float <= 0:
                 messagebox.showerror("Error", "El monto debe ser positivo")

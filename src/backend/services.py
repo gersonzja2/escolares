@@ -1,10 +1,14 @@
 import csv
 from typing import List, Any
+from datetime import datetime
 
 # Intentar importar reportlab, manejar error si no existe
 try:
-    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.enums import TA_CENTER
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
@@ -34,55 +38,64 @@ class ReportService:
         email_apo = email_apo if email_apo else "No registrado"
         fecha_reg = fecha_reg if fecha_reg else "No registrada"
 
-        c = canvas.Canvas(file_path, pagesize=letter)
-        width, height = letter
+        doc = SimpleDocTemplate(file_path, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
         
-        # Encabezado
-        c.setFont("Helvetica-Bold", 20)
-        c.drawString(50, height - 50, "Ficha del Estudiante")
+        # Título
+        title_style = styles["Heading1"]
+        title_style.alignment = TA_CENTER
+        elements.append(Paragraph(f"Ficha del Estudiante - {nombre_escuela}", title_style))
+        elements.append(Spacer(1, 20))
         
-        # Datos Alumno
-        c.setFont("Helvetica", 12)
-        c.drawString(50, height - 100, f"Nombre del Alumno: {nombre_alu}")
-        c.drawString(50, height - 120, f"Grado/Curso: {grado}")
-        c.drawString(350, height - 120, f"Fecha Registro: {fecha_reg}")
+        # Datos del Alumno y Apoderado (Tabla)
+        data_info = [
+            ["Información del Alumno", "", "Información del Apoderado", ""],
+            ["Nombre:", nombre_alu, "Nombre:", nombre_apo],
+            ["Grado:", grado, "Teléfono:", tel_apo],
+            ["Fecha Reg:", fecha_reg, "Email:", email_apo]
+        ]
         
-        c.line(50, height - 140, width - 50, height - 140)
+        t_info = Table(data_info, colWidths=[80, 180, 80, 180])
+        t_info.setStyle(TableStyle([
+            ('SPAN', (0,0), (1,0)), # Título Alumno
+            ('SPAN', (2,0), (3,0)), # Título Apoderado
+            ('BACKGROUND', (0,0), (3,0), colors.lightgrey),
+            ('FONTNAME', (0,0), (3,0), 'Helvetica-Bold'),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ]))
+        elements.append(t_info)
+        elements.append(Spacer(1, 20))
         
-        # Datos Apoderado
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(50, height - 170, "Información del Apoderado")
+        # Historial de Pagos
+        elements.append(Paragraph("Historial de Pagos", styles["Heading2"]))
+        elements.append(Spacer(1, 10))
         
-        c.setFont("Helvetica", 12)
-        c.drawString(50, height - 200, f"Nombre: {nombre_apo}")
-        c.drawString(50, height - 220, f"Teléfono: {tel_apo}")
-        c.drawString(50, height - 240, f"Email: {email_apo}")
-        
-        # Tabla de Pagos
-        y = height - 280
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(50, y, "Historial de Pagos Recientes")
-        y -= 25
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(50, y, "Mes")
-        c.drawString(200, y, "Monto")
-        c.drawString(350, y, "Fecha Pago")
-        c.line(50, y-5, 500, y-5)
-        y -= 20
-        c.setFont("Helvetica", 10)
-        
-        for p in pagos[:15]: # Mostrar solo los últimos 15
+        data_pagos = [["Mes", "Monto", "Fecha Pago"]]
+        for p in pagos:
             mes, monto, fecha = p
-            c.drawString(50, y, str(mes))
-            c.drawString(200, y, f"${monto:,.0f}")
-            c.drawString(350, y, str(fecha) if fecha else "")
-            y -= 15
-
-        # Pie de página
-        c.setFont("Helvetica-Oblique", 10)
-        c.drawString(50, 50, f"Generado por Sistema de Gestión Escolar - {nombre_escuela}")
+            data_pagos.append([mes, f"${monto:,.0f}", str(fecha) if fecha else "Pendiente"])
         
-        c.save()
+        if not pagos:
+            data_pagos.append(["Sin registros", "-", "-"])
+        
+        t_pagos = Table(data_pagos, colWidths=[150, 150, 200])
+        t_pagos.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.beige]),
+        ]))
+        elements.append(t_pagos)
+
+        elements.append(Spacer(1, 30))
+        elements.append(Paragraph(f"Generado por Sistema de Gestión Escolar - {datetime.now().strftime('%d/%m/%Y')}", styles["Italic"]))
+        
+        doc.build(elements)
 
     @staticmethod
     def generar_recibo_pago_pdf(file_path: str, datos_pago: tuple, nombre_escuela: str):
@@ -92,31 +105,41 @@ class ReportService:
         # datos_pago: (id, nombre_alu, grado, monto, mes, fecha)
         id_pago, nombre_alu, grado, monto, mes, fecha = datos_pago
         
-        # Usamos media carta o similar para recibos, pero letter está bien por simplicidad
-        c = canvas.Canvas(file_path, pagesize=letter)
+        doc = SimpleDocTemplate(file_path, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
         
-        # Diseño tipo "Voucher"
-        c.setLineWidth(2)
-        c.rect(50, 500, 500, 250) # Marco
+        # Título
+        title_style = styles["Heading1"]
+        title_style.alignment = TA_CENTER
+        elements.append(Paragraph(f"RECIBO DE PAGO - {nombre_escuela.upper()}", title_style))
+        elements.append(Spacer(1, 20))
         
-        c.setFont("Helvetica-Bold", 18)
-        c.drawCentredString(300, 720, f"RECIBO DE PAGO - {nombre_escuela.upper()}")
+        # Datos
+        data = [
+            ["N° Transacción:", f"#{id_pago:06d}"],
+            ["Fecha:", str(fecha)],
+            ["Recibimos de:", nombre_alu],
+            ["Grado/Curso:", grado],
+            ["Concepto:", f"Mensualidad {mes}"],
+            ["Monto Total:", f"${monto:,.0f}"]
+        ]
         
-        c.setFont("Helvetica", 12)
-        c.drawString(70, 680, f"N° de Transacción: #{id_pago:06d}")
-        c.drawString(350, 680, f"Fecha: {fecha}")
+        t = Table(data, colWidths=[150, 300])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (0,-1), colors.lightgrey),
+            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('BOX', (0,0), (-1,-1), 2, colors.black),
+            ('PADDING', (0,0), (-1,-1), 10),
+        ]))
+        elements.append(t)
         
-        c.line(70, 670, 530, 670)
+        elements.append(Spacer(1, 30))
         
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(70, 630, f"Recibimos de: {nombre_alu}")
-        c.setFont("Helvetica", 12)
-        c.drawString(70, 610, f"Grado/Curso: {grado}")
+        footer_style = styles["Italic"]
+        footer_style.alignment = TA_CENTER
+        elements.append(Paragraph("Gracias por su pago.", footer_style))
         
-        c.drawString(70, 570, f"La suma de: ${monto:,.0f}")
-        c.drawString(70, 550, f"Por concepto de: Mensualidad {mes}")
-        
-        c.setFont("Helvetica-Oblique", 10)
-        c.drawCentredString(300, 520, "Gracias por su pago.")
-        
-        c.save()
+        doc.build(elements)
